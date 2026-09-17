@@ -21,7 +21,8 @@ const globalForDb = globalThis as unknown as {
   ampPgSynced?: boolean;
 };
 const SEED_VERSION = "vit-11";
-const DB_FILE = path.join(process.cwd(), "data", "academic.db");
+const DATA_DIR = process.env.VERCEL ? path.join("/tmp", "academic-monitoring") : path.join(process.cwd(), "data");
+const DB_FILE = path.join(DATA_DIR, "academic.db");
 
 export type SqlRow = Record<string, unknown>;
 
@@ -68,9 +69,8 @@ export function getDb(): DatabaseSync {
     if (!globalForDb.ampPgReady) globalForDb.ampPgReady = syncPostgres(globalForDb.ampDb);
     return globalForDb.ampDb;
   }
-  const dataDir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dataDir, { recursive: true });
-  fs.mkdirSync(path.join(dataDir, "uploads"), { recursive: true });
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(path.join(DATA_DIR, "uploads"), { recursive: true });
   const db = openDb();
   migrate(db);
   if (isEmpty(db)) {
