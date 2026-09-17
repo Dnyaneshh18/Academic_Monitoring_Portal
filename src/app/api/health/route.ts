@@ -11,6 +11,7 @@ export async function GET() {
   const sqliteUsers = one<{ c: number }>("SELECT COUNT(*) as c FROM users");
   const counts = pool ? await pgTableCounts() : null;
   return json({
+    version: "fd12ba7",
     postgres: {
       url: postgresUrl().replace(/:[^:@/]+@/, ":****@"),
       connected: pgConnected() && Boolean(pool),
