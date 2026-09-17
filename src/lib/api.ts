@@ -6,6 +6,15 @@ import { flushPgWrites } from "./postgres";
 export async function requireUser(): Promise<SessionUser | NextResponse> {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const localUser = one<{ id: string; role: string; college_id: string | null }>(
+    "SELECT id, role, college_id FROM users WHERE email = ? AND active = 1",
+    [user.email.toLowerCase()]
+  );
+  if (localUser) {
+    user.id = localUser.id;
+    user.role = localUser.role as SessionUser["role"];
+    user.collegeId = localUser.college_id || undefined;
+  }
   if (user.role === "FACULTY" || user.role === "HOD") {
     const fac = one<{ id: string; department_id: string }>("SELECT id, department_id FROM faculty WHERE user_id = ?", [
       user.id
