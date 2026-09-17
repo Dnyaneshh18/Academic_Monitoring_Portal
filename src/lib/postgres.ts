@@ -493,6 +493,9 @@ export async function copyPostgresToSqlite(sqlite: {
   try {
     sqlite.exec("BEGIN");
     sqlite.exec("PRAGMA foreign_keys = OFF");
+    for (const table of COPY_TABLES.slice().reverse()) {
+      sqlite.exec(`DELETE FROM ${table}`);
+    }
     for (const table of COPY_TABLES) {
       const res = await client.query(`SELECT * FROM ${table}`);
       if (!res.rows.length) continue;

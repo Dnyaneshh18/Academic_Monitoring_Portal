@@ -125,7 +125,7 @@ async function syncPostgres(db: DatabaseSync) {
     }
     const sqliteUsers = (db.prepare("SELECT COUNT(*) as c FROM users").get() as { c: number })?.c || 0;
     const pgUsers = await pgUserCount();
-    if (sqliteUsers === 0 && pgUsers > 0) {
+    if (process.env.VERCEL && pgUsers > 0) {
       await copyPostgresToSqlite(db);
     }
     globalForDb.ampPgSynced = true;
