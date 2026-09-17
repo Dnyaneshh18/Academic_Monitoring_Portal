@@ -44,11 +44,11 @@ export async function POST(req: NextRequest) {
     const ext = path.extname(file.name || "").toLowerCase();
     if (!ALLOWED.has(ext)) return json({ error: "Assignment file: PDF, Word, PPT, Excel, image, TXT or ZIP" }, 400);
     if (file.size > 15 * 1024 * 1024) return json({ error: "File must be under 15 MB" }, 400);
-    const dir = path.join(process.cwd(), "data", "uploads", "briefs");
-    fs.mkdirSync(dir, { recursive: true });
     briefName = (file.name || "assignment.pdf").replace(/[^a-zA-Z0-9._-]/g, "_");
     briefData = Buffer.from(await file.arrayBuffer());
     if (!process.env.VERCEL) {
+      const dir = path.join(process.cwd(), "data", "uploads", "briefs");
+      fs.mkdirSync(dir, { recursive: true });
       briefPath = path.join(dir, `${id}${ext}`);
       fs.writeFileSync(briefPath, briefData);
       briefData = null;
