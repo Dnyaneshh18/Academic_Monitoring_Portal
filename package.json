@@ -2,6 +2,9 @@
   "name": "academic-monitoring-portal",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "description": "Academic Monitoring Portal — attendance, assessments, mentoring and reports for institutes.",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
@@ -28,12 +31,14 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^20.17.6",
+    "@types/node": "^22.10.2",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.23.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.5",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3"

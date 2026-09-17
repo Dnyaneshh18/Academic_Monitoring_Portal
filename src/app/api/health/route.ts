@@ -3,6 +3,7 @@ import { json } from "@/lib/api";
 import { getPool, pgConnected, pgLastError, pgTableCounts, postgresUrl } from "@/lib/postgres";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   await ensureDb();

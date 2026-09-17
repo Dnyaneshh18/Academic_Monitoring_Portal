@@ -4,6 +4,7 @@ import { isResponse, json, requireUser } from "@/lib/api";
 import { addMentoring, collegeScope, listMentoring } from "@/lib/queries";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function studentInCollege(studentId: string, collegeId: string) {
   return !!one(

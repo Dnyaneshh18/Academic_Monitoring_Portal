@@ -434,7 +434,7 @@ async function upsertRows(client: PoolClient, table: string, rows: Record<string
 }
 
 export async function copySqliteToPostgres(sqlite: {
-  prepare: (sql: string) => { all: (...a: unknown[]) => unknown[]; get: (...a: unknown[]) => unknown };
+  prepare: (sql: string) => { all: (...a: any[]) => unknown[]; get: (...a: any[]) => unknown };
 }) {
   const pool = await getPool();
   if (!pool) return false;
@@ -472,7 +472,7 @@ export async function copySqliteToPostgres(sqlite: {
 
 export async function copyPostgresToSqlite(sqlite: {
   exec: (sql: string) => void;
-  prepare: (sql: string) => { run: (...a: unknown[]) => unknown };
+  prepare: (sql: string) => { run: (...a: any[]) => unknown };
 }) {
   const pool = await getPool();
   if (!pool) return false;

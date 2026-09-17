@@ -2,6 +2,7 @@ import { ensureDb } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   await ensureDb();

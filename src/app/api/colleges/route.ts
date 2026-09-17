@@ -7,6 +7,7 @@ import { isSuperAdmin } from "@/lib/college";
 import { listCollegeSummaries } from "@/lib/queries";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   await ensureDb();

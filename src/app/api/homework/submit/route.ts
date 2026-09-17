@@ -6,6 +6,7 @@ import { isResponse, json, requireUser } from "@/lib/api";
 import { uid } from "@/lib/ids";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ALLOWED = new Set([
   ".pdf",

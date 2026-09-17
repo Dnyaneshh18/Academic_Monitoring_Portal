@@ -5,6 +5,7 @@ import { facultyOwnsSubject, listStudents } from "@/lib/queries";
 import { uid } from "@/lib/ids";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function taskRow(id: string) {
   return one<{
@@ -94,13 +95,18 @@ async function getHomework(req: NextRequest) {
   if (taskId) {
     const task = taskRow(taskId);
     if (!task || task.faculty_id !== user.facultyId) return json({ error: "Not found" }, 404);
-    const roster = listStudents(task.class_id, task.batch || null);
+    const roster = listStudents(task.class_id, task.batch || null) as {
+      id: string;
+      name: string;
+      roll_no: string;
+      batch: string;
+    }[];
     const subs = all<{ student_id: string; id: string; file_name: string; submitted_at: string; verified: number; obtained: number; remark: string }>(
       "SELECT * FROM homework_submissions WHERE task_id = ?",
       [taskId]
     );
     const smap = Object.fromEntries(subs.map((s) => [s.student_id, s]));
-    const students = roster.map((s: { id: string; name: string; roll_no: string; batch: string }) => ({
+    const students = roster.map((s) => ({
       id: s.id,
       name: s.name,
       roll_no: s.roll_no,

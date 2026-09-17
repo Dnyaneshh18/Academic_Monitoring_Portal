@@ -4,6 +4,7 @@ import { ensureDb, all, one, run } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function adminOnly(user: { role: string }) {
   return user.role === "ADMIN" || user.role === "COLLEGE_ADMIN";

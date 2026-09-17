@@ -145,16 +145,16 @@ function isEmpty(db: DatabaseSync) {
 }
 
 export function all<T = SqlRow>(sql: string, params: unknown[] = []): T[] {
-  return getDb().prepare(sql).all(...params) as T[];
+  return getDb().prepare(sql).all(...(params as any[])) as T[];
 }
 
 export function one<T = SqlRow>(sql: string, params: unknown[] = []): T | undefined {
-  return getDb().prepare(sql).get(...params) as T | undefined;
+  return getDb().prepare(sql).get(...(params as any[])) as T | undefined;
 }
 
 export function run(sql: string, params: unknown[] = []) {
   const db = getDb();
-  const res = db.prepare(sql).run(...params);
+  const res = db.prepare(sql).run(...(params as any[]));
   try {
     db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
   } catch {

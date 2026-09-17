@@ -7,6 +7,7 @@ import { one } from "@/lib/db";
 import { collegeScope } from "@/lib/queries";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 async function fileToText(file: File) {
   const name = file.name.toLowerCase();

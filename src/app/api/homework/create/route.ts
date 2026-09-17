@@ -7,6 +7,7 @@ import { facultyOwnsSubject } from "@/lib/queries";
 import { uid } from "@/lib/ids";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ALLOWED = new Set([".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png", ".txt", ".zip"]);
 

@@ -3,6 +3,7 @@ import { isResponse, json, requireUser } from "@/lib/api";
 import { collegeScope, reportBundle } from "@/lib/queries";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {

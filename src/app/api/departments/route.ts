@@ -4,6 +4,7 @@ import { isResponse, json, requireUser } from "@/lib/api";
 import { collegeScope, createDepartment, listDepartments } from "@/lib/queries";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   await ensureDb();

@@ -5,6 +5,7 @@ import { uid } from "@/lib/ids";
 import { sendMail, smtpConfigured } from "@/lib/mail";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   await ensureDb();

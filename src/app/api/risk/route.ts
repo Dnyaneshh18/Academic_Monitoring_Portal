@@ -5,6 +5,7 @@ import { collegeScope } from "@/lib/queries";
 import { scoreStudents } from "@/lib/risk";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   await ensureDb();
