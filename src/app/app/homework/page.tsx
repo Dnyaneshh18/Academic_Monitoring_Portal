@@ -220,7 +220,7 @@ export default function HomeworkPage() {
       <div>
         <PageHeader kicker="My work" title="Assignments" hint="Upload PDF, Word, PPT, Excel, images or ZIP before the due date." />
         {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
-        {error && !/request failed/i.test(error) ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
+        {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
         <div className="space-y-3">
           {tasks.map((t) => (
             <article key={t.id} className="glass p-4">
@@ -268,7 +268,7 @@ export default function HomeworkPage() {
         hint="Create for a division or a lab batch. Students upload files. Verify all awards full marks only to those who submitted."
       />
       {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
-      {error && !/request failed/i.test(error) ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
+      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
       {allotments.length === 0 ? (
         <p className="mb-3 text-sm text-ink-500">No class is allotted to you yet. Ask your HOD / college admin to assign a subject.</p>
       ) : null}

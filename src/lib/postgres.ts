@@ -569,6 +569,7 @@ export async function flushPgWrites() {
           console.error("[amp] PostgreSQL write failed:", (err as Error).message, item.sql.slice(0, 120));
           globalPg.ampPgLastError = (err as Error).message;
           q.shift();
+          throw err;
         }
       }
     } finally {

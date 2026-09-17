@@ -60,6 +60,10 @@ export async function POST(req: NextRequest) {
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id, user.facultyId, subjectId, sub.class_id, batch, title, instructions, maxMarks, dueDate, briefName, briefPath, briefData]
   );
-  await flushPgWrites();
+  try {
+    await flushPgWrites();
+  } catch (err) {
+    return json({ error: `PostgreSQL publish failed: ${(err as Error).message}` }, 500);
+  }
   return json({ id });
 }
