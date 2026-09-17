@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSession, type SessionUser } from "./auth";
 import { one } from "./db";
+import { flushPgWrites } from "./postgres";
 
 export async function requireUser(): Promise<SessionUser | NextResponse> {
   const user = await readSession();
@@ -63,6 +64,7 @@ export function isResponse(x: SessionUser | NextResponse): x is NextResponse {
   return x instanceof NextResponse;
 }
 
-export function json(data: unknown, status = 200) {
+export async function json(data: unknown, status = 200) {
+  await flushPgWrites();
   return NextResponse.json(data, { status });
 }
