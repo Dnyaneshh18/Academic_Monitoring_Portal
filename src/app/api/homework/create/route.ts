@@ -5,6 +5,7 @@ import { ensureDb, one, run } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
 import { facultyOwnsSubject } from "@/lib/queries";
 import { uid } from "@/lib/ids";
+import { flushPgWrites } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,5 +55,6 @@ export async function POST(req: NextRequest) {
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [id, user.facultyId, subjectId, sub.class_id, batch, title, instructions, maxMarks, dueDate, briefName, briefPath]
   );
+  await flushPgWrites();
   return json({ id });
 }

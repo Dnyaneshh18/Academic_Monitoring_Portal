@@ -88,6 +88,7 @@ export function getDb(): DatabaseSync {
 export async function ensureDb() {
   const db = getDb();
   if (!globalForDb.ampPgReady) globalForDb.ampPgReady = syncPostgres(db);
+  await globalForDb.ampPgReady;
   return db;
 }
 
@@ -112,13 +113,14 @@ async function syncPostgres(db: DatabaseSync) {
     }
     const sqliteUsers = (db.prepare("SELECT COUNT(*) as c FROM users").get() as { c: number })?.c || 0;
     const pgUsers = await pgUserCount();
-    if (sqliteUsers === 0 && pgUsers > 0) {
+    if (pgUsers > 0) {
       await copyPostgresToSqlite(db);
     }
     globalForDb.ampPgSynced = true;
-    void copySqliteToPostgres(db)
-      .then(() => flushPgWrites())
-      .catch((e) => console.warn("[amp] background copy:", (e as Error).message));
+    if (pgUsers === 0) {
+      await copySqliteToPostgres(db);
+      await flushPgWrites();
+    }
     console.info("[amp] PostgreSQL connected. New writes go there; current data copies in the background.");
   } catch (e) {
     console.warn("[amp] PostgreSQL sync skipped — portal still runs on local data.", (e as Error).message);
