@@ -421,17 +421,26 @@ async function upsertRows(client: PoolClient, table: string, rows: Record<string
     .filter((c) => c !== pk)
     .map((c) => `"${c}" = EXCLUDED."${c}"`)
     .join(", ");
-  let n = 0;
-  for (const row of rows) {
-    const vals = cols.map((c) => row[c] ?? null);
-    const ph = cols.map((_, i) => `$${i + 1}`).join(",");
+  const maxParameters = 60000;
+  const rowsPerBatch = Math.max(1, Math.floor(maxParameters / cols.length));
+  let inserted = 0;
+  for (let start = 0; start < rows.length; start += rowsPerBatch) {
+    const batch = rows.slice(start, start + rowsPerBatch);
+    const values: unknown[] = [];
+    const valueSql = batch
+      .map((row) => {
+        const offset = values.length;
+        values.push(...cols.map((c) => row[c] ?? null));
+        return `(${cols.map((_, i) => `$${offset + i + 1}`).join(",")})`;
+      })
+      .join(",");
     const sql = updates
-      ? `INSERT INTO ${table} (${colSql}) VALUES (${ph}) ON CONFLICT ("${pk}") DO UPDATE SET ${updates}`
-      : `INSERT INTO ${table} (${colSql}) VALUES (${ph}) ON CONFLICT ("${pk}") DO NOTHING`;
-    await client.query(sql, vals);
-    n += 1;
+      ? `INSERT INTO ${table} (${colSql}) VALUES ${valueSql} ON CONFLICT ("${pk}") DO UPDATE SET ${updates}`
+      : `INSERT INTO ${table} (${colSql}) VALUES ${valueSql} ON CONFLICT ("${pk}") DO NOTHING`;
+    await client.query(sql, values);
+    inserted += batch.length;
   }
-  return n;
+  return inserted;
 }
 
 export async function copySqliteToPostgres(sqlite: {
