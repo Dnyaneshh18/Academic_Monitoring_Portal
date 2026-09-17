@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-ink-50 text-ink-900 antialiased;
+  background-image:
+    radial-gradient(1100px 520px at 8% -12%, rgba(39, 169, 150, 0.14), transparent 58%),
+    radial-gradient(900px 420px at 100% 0%, rgba(212, 168, 75, 0.12), transparent 52%),
+    linear-gradient(180deg, #f7fafc 0%, #eef3f8 100%);
+}
+
+.amp-card {
+  @apply rounded-2xl border border-white/80 bg-white/80 shadow-card backdrop-blur-sm;
+}
+
+.crest-ring {
+  box-shadow: 0 0 0 3px #d4a84b, 0 0 0 6px #152536;
+}
+
+.table-wrap {
+  @apply overflow-auto rounded-2xl border border-ink-200/70 bg-white;
+}
+
+table.data {
+  @apply w-full text-sm;
+}
+
+table.data th {
+  @apply sticky top-0 bg-ink-900 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-white;
+}
+
+table.data td {
+  @apply border-t border-ink-100 px-3 py-2.5 align-middle;
+}
+
+table.data tr:hover td {
+  @apply bg-brand-50/60;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition;
+}
+
+.btn-primary {
+  @apply btn bg-ink-900 text-white shadow-card hover:bg-ink-800;
+}
+
+.btn-accent {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+
+.btn-ghost {
+  @apply btn border border-ink-200 bg-white text-ink-800 hover:bg-ink-50;
+}
+
+button,
+.btn,
+.btn-primary,
+.btn-accent,
+.btn-ghost {
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease,
+    filter 0.14s ease,
+    background-color 0.14s ease;
+}
+
+button:hover:not(:disabled),
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+button:active:not(:disabled),
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+  filter: brightness(0.95);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.field {
+  @apply w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:shadow-glow;
+}
+
+.label {
+  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold;
+}
+
+.amp-fade > * {
+  animation: fadeUp 0.45s ease both;
+}
+.amp-fade > *:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.amp-fade > *:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.amp-fade > *:nth-child(4) {
+  animation-delay: 0.18s;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amp-fade > * {
+    animation: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

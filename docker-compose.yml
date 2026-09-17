@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: amp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Nandu@123
+      POSTGRES_DB: academic_monitoring_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - amp_pgdata:/var/lib/postgresql/data
+      - ./database/postgresql_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
+volumes:
+  amp_pgdata:
