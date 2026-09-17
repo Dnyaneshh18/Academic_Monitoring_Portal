@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import { ensureDb, one } from "@/lib/db";
 import { isResponse, requireUser } from "@/lib/api";
+import { pgQuery } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     brief_path: string | null;
     brief_data: Buffer | null;
   }>("SELECT * FROM homework_tasks WHERE id = ?", [id]);
-  if (!task?.brief_path && !task?.brief_data) return NextResponse.json({ error: "No assignment file" }, { status: 404 });
+  if (!task) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
 
   if (user.role === "STUDENT") {
     const st = one<{ id: string; class_id: string; batch: string }>(
@@ -35,9 +36,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const buf = task.brief_data || (task.brief_path && fs.existsSync(task.brief_path) ? fs.readFileSync(task.brief_path) : null);
+  const pgFile = await pgQuery("SELECT brief_data, brief_name FROM homework_tasks WHERE id = ?", [id]);
+  const pgRow = pgFile?.rows[0] as { brief_data: Buffer | null; brief_name: string | null } | undefined;
+  const buf =
+    pgRow?.brief_data ||
+    task.brief_data ||
+    (task.brief_path && fs.existsSync(task.brief_path) ? fs.readFileSync(task.brief_path) : null);
   if (!buf) return NextResponse.json({ error: "File missing" }, { status: 404 });
-  const name = task.brief_name || "assignment.pdf";
+  const name = pgRow?.brief_name || task.brief_name || "assignment.pdf";
   const inline = req.nextUrl.searchParams.get("inline") === "1" || name.toLowerCase().endsWith(".pdf") || name.toLowerCase().match(/\.(png|jpg|jpeg|gif)$/);
   return new NextResponse(new Uint8Array(buf), {
     headers: {

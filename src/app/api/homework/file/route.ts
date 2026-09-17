@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import { ensureDb, one } from "@/lib/db";
 import { isResponse, requireUser } from "@/lib/api";
+import { pgQuery } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,12 +34,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const buf = sub.file_data || (sub.stored_path && fs.existsSync(sub.stored_path) ? fs.readFileSync(sub.stored_path) : null);
+  const pgFile = await pgQuery("SELECT file_data, file_name, mime FROM homework_submissions WHERE id = ?", [id]);
+  const pgRow = pgFile?.rows[0] as { file_data: Buffer | null; file_name: string; mime: string | null } | undefined;
+  const buf =
+    pgRow?.file_data ||
+    sub.file_data ||
+    (sub.stored_path && fs.existsSync(sub.stored_path) ? fs.readFileSync(sub.stored_path) : null);
   if (!buf) return NextResponse.json({ error: "File missing" }, { status: 404 });
   return new NextResponse(new Uint8Array(buf), {
     headers: {
-      "Content-Type": sub.mime || "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${sub.file_name.replace(/"/g, "")}"`
+      "Content-Type": pgRow?.mime || sub.mime || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${(pgRow?.file_name || sub.file_name).replace(/"/g, "")}"`
     }
   });
 }
