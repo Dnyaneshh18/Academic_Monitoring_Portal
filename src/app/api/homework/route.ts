@@ -3,6 +3,7 @@ import { ensureDb, all, one, run } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
 import { facultyOwnsSubject, listStudents } from "@/lib/queries";
 import { uid } from "@/lib/ids";
+import { syncHomeworkFromPostgres } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +49,8 @@ export async function GET(req: NextRequest) {
 }
 
 async function getHomework(req: NextRequest) {
-  await ensureDb();
+  const db = await ensureDb();
+  await syncHomeworkFromPostgres(db);
   const user = await requireUser();
   if (isResponse(user)) return user;
   const taskId = req.nextUrl.searchParams.get("id");

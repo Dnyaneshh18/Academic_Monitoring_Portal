@@ -523,6 +523,48 @@ export async function copyPostgresToSqlite(sqlite: {
   }
 }
 
+export async function syncHomeworkFromPostgres(sqlite: {
+  exec: (sql: string) => void;
+  prepare: (sql: string) => { run: (...a: any[]) => unknown };
+}) {
+  const pool = await getPool();
+  if (!pool) return false;
+  const client = await pool.connect();
+  try {
+    const tasks = await client.query("SELECT * FROM homework_tasks");
+    const submissions = await client.query("SELECT * FROM homework_submissions");
+    sqlite.exec("BEGIN");
+    sqlite.exec("PRAGMA foreign_keys = OFF");
+    sqlite.exec("DELETE FROM homework_submissions");
+    sqlite.exec("DELETE FROM homework_tasks");
+    for (const row of tasks.rows) {
+      const cols = Object.keys(row);
+      sqlite.prepare(`INSERT OR REPLACE INTO homework_tasks (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(
+        ...cols.map((c) => row[c])
+      );
+    }
+    for (const row of submissions.rows) {
+      const cols = Object.keys(row);
+      sqlite.prepare(`INSERT OR REPLACE INTO homework_submissions (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(
+        ...cols.map((c) => row[c])
+      );
+    }
+    sqlite.exec("PRAGMA foreign_keys = ON");
+    sqlite.exec("COMMIT");
+    return true;
+  } catch (err) {
+    try {
+      sqlite.exec("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    console.error("[amp] Homework cache refresh failed:", (err as Error).message);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
 export async function pgUserCount() {
   const pool = await getPool();
   if (!pool) return -1;
