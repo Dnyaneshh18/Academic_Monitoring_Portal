@@ -125,7 +125,7 @@ export default function AssignFacultyPage() {
         hint="Allot a faculty member to a branch + division for theory, or to a lab batch. Faculty login shows only these classes."
       />
 
-      <div className="mb-6 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-3">
+      <div className="mb-6 grid gap-3 glass p-4 md:grid-cols-3">
         <div>
           <label className="label">Faculty</label>
           <select className="field" value={form.facultyId} onChange={(e) => setForm({ ...form, facultyId: e.target.value })}>
@@ -193,7 +193,7 @@ export default function AssignFacultyPage() {
           </button>
         </div>
         {msg ? <p className="self-center text-sm text-brand-700 md:col-span-3">{msg}</p> : null}
-        {error ? <p className="self-center text-sm text-rose-700 md:col-span-3">{error}</p> : null}
+        {error ? <p className="self-center text-sm text-danger md:col-span-3">{error}</p> : null}
       </div>
 
       <div className="table-wrap">

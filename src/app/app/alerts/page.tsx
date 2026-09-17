@@ -80,13 +80,13 @@ export default function AlertsPage() {
         title="Parent notifications"
         hint="HIGH-risk students (falling scores and/or attendance below 60%). Send a drafted email to the parent."
       />
-      <p className={`mb-4 text-sm ${smtp ? "text-brand-700" : "text-amber-800"}`}>
+      <p className={`mb-4 text-sm ${smtp ? "text-brand-700" : "text-warning"}`}>
         {smtp
           ? "SMTP is configured. Send will deliver a real email."
           : "SMTP is not configured yet. Click Send to preview the draft. To deliver to nvasantpatil@gmail.com, add Gmail SMTP_USER + App Password (see .env.example)."}
       </p>
       {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
-      {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
 
       <div className="table-wrap">
         <table className="data">
@@ -111,7 +111,7 @@ export default function AlertsPage() {
                   </div>
                 </td>
                 <td>{r.prn}</td>
-                <td className="font-semibold text-rose-700">{r.attendancePct}%</td>
+                <td className="font-semibold text-danger">{r.attendancePct}%</td>
                 <td>{r.marksPct}%</td>
                 <td className="text-xs">{r.reasons.join(" · ")}</td>
                 <td>{r.parentEmail || "null"}</td>
@@ -155,7 +155,7 @@ export default function AlertsPage() {
                 <td>{l.parent_email}</td>
                 <td>
                   {l.status}
-                  {l.error ? <div className="text-xs text-rose-700">{l.error}</div> : null}
+                  {l.error ? <div className="text-xs text-danger">{l.error}</div> : null}
                 </td>
               </tr>
             ))}

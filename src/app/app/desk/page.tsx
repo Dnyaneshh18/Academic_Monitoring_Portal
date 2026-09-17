@@ -110,10 +110,10 @@ export default function FacultyDeskPage() {
         title="Allotted classes"
         hint="Pick a theory division or lab batch. The ML model flags students at risk of defaulter / weak internals so you can mentor them."
       />
-      {error && !/request failed/i.test(error) ? <p className="mb-4 text-sm text-rose-700">{error}</p> : null}
+      {error && !/request failed/i.test(error) ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-ink-100 bg-white p-5">
+        <section className="glass p-5">
           <h2 className="font-display text-xl">Theory lectures — branch & division</h2>
           <div className="mt-3 space-y-2">
             {theory.map((a) => (
@@ -133,7 +133,7 @@ export default function FacultyDeskPage() {
             {theory.length === 0 ? <p className="text-sm text-ink-500">No theory allotment.</p> : null}
           </div>
         </section>
-        <section className="rounded-2xl border border-ink-100 bg-white p-5">
+        <section className="glass p-5">
           <h2 className="font-display text-xl">Laboratory — batch</h2>
           <div className="mt-3 space-y-2">
             {labs.map((a) => (
@@ -156,7 +156,7 @@ export default function FacultyDeskPage() {
       </div>
 
       {allotment ? (
-        <section className="mt-6 rounded-2xl border border-ink-100 bg-white p-5">
+        <section className="mt-6 glass p-5">
           <div className="mb-4">
             <p className="text-xs uppercase tracking-wide text-brand-700">Selected allotment</p>
             <h3 className="font-display text-2xl">
@@ -205,9 +205,9 @@ export default function FacultyDeskPage() {
                   const lvl = rk?.level || "LOW";
                   const badge =
                     lvl === "HIGH"
-                      ? "bg-rose-100 text-rose-800"
+                      ? "badge badge-danger"
                       : lvl === "MEDIUM"
-                        ? "bg-amber-100 text-amber-900"
+                        ? "badge badge-warning"
                         : "bg-brand-100 text-brand-800";
                   return (
                     <tr key={s.id}>

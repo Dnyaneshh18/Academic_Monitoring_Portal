@@ -2,8 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   Academic Monitoring Portal — dark neon-gradient design system
+   Spec tokens first, then the component layer. No hard-coded hex should be
+   needed in components: everything below is addressable by class or var().
+   ========================================================================== */
+
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+
+  --bg-base: #1c1c27;
+  --bg-elevated: #262633;
+  --bg-inset: #2e2e3d;
+  --stroke: rgba(255, 255, 255, 0.07);
+
+  --text-primary: #ffffff;
+  --text-secondary: #a9a9bc;
+  --text-muted: #6e6e82;
+
+  --grad-violet: linear-gradient(135deg, #7b3fe4 0%, #a855f7 100%);
+  --grad-coral: linear-gradient(135deg, #f43f5e 0%, #fb923c 100%);
+  --violet-solid: #8b5cf6;
+  --coral-solid: #f76b6b;
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f43f5e;
+
+  --radius-card: 20px;
+  --radius-control: 12px;
+  --ease: 200ms ease;
 }
 
 html,
@@ -12,99 +40,744 @@ body {
 }
 
 body {
-  @apply bg-ink-50 text-ink-900 antialiased;
-  background-image:
-    radial-gradient(1100px 520px at 8% -12%, rgba(39, 169, 150, 0.14), transparent 58%),
-    radial-gradient(900px 420px at 100% 0%, rgba(212, 168, 75, 0.12), transparent 52%),
-    linear-gradient(180deg, #f7fafc 0%, #eef3f8 100%);
+  background-color: var(--bg-base);
+  color: var(--text-secondary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
+/* Ambient radial glows behind the whole app (spec: violet top-left, coral
+   bottom-right, ~18% opacity, blurred). Fixed so they read on every route. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(900px 520px at -6% -10%, rgba(123, 63, 228, 0.18), transparent 62%),
+    radial-gradient(720px 420px at 104% 106%, rgba(244, 63, 94, 0.18), transparent 60%);
+  filter: blur(6px);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--text-primary);
+}
+
+::selection {
+  background: rgba(139, 92, 246, 0.35);
+  color: #fff;
+}
+
+/* Scrollbars — flat gray bars would break the glass look */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+  background-clip: content-box;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-card);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* solid elevated surface — dense tables, drawers, sticky bars */
+.panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-card);
+}
+
+.inset {
+  background: var(--bg-inset);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+}
+
+/* legacy alias: the old light "amp-card" is now a glass card */
 .amp-card {
-  @apply rounded-2xl border border-white/80 bg-white/80 shadow-card backdrop-blur-sm;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-card);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.grad-text {
+  background: var(--grad-violet);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.grad-text-coral {
+  background: var(--grad-coral);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
 }
 
 .crest-ring {
-  box-shadow: 0 0 0 3px #d4a84b, 0 0 0 6px #152536;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.9), 0 0 0 6px rgba(168, 85, 247, 0.25);
 }
 
-.table-wrap {
-  @apply overflow-auto rounded-2xl border border-ink-200/70 bg-white;
+.divider {
+  height: 1px;
+  background: var(--stroke);
 }
 
-table.data {
-  @apply w-full text-sm;
+/* ---------------------------------------------------------------- controls */
+
+/* Every .btn-* variant carries the base geometry itself, not just .btn.
+   Most call sites in this codebase are written `<button className="btn-accent">`
+   WITHOUT the `btn` class (42 of 63 usages), so anchoring the base styles on
+   `.btn` alone left those buttons with no padding, no radius and no
+   flex-shrink guard - Tailwind's preflight zeroes button padding, so the label
+   overflowed the gradient and it read as a broken, misaligned shape.
+   Grouping the selectors is what keeps bare `btn-accent` correct. */
+.btn,
+.btn-primary,
+.btn-accent,
+.btn-ghost,
+.btn-quiet,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-control);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  /* A button must never be squeezed by the flex row it sits in, or the label
+     spills outside the gradient. */
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: transform var(--ease), box-shadow var(--ease), filter var(--ease),
+    background-color var(--ease), border-color var(--ease), color var(--ease);
 }
 
-table.data th {
-  @apply sticky top-0 bg-ink-900 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-white;
+/* Size variants live here, not as Tailwind utilities: .btn sets padding and
+   font-size as an unlayered rule, which always beats the layered utilities, so
+   `px-6 py-3 text-[15px]` on a .btn is silently discarded. */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
 }
 
-table.data td {
-  @apply border-t border-ink-100 px-3 py-2.5 align-middle;
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 15px;
 }
 
-table.data tr:hover td {
-  @apply bg-brand-50/60;
-}
-
-.btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition;
-}
-
+/* Gradient fills get a tight drop shadow plus a 1px inner top highlight, so the
+   edge reads as a crisp surface instead of a soft coloured smear on the dark bg. */
 .btn-primary {
-  @apply btn bg-ink-900 text-white shadow-card hover:bg-ink-800;
+  background-image: var(--grad-violet);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(123, 63, 228, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .btn-accent {
-  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  background-image: var(--grad-coral);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(244, 63, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .btn-ghost {
-  @apply btn border border-ink-200 bg-white text-ink-800 hover:bg-ink-50;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--stroke);
+  color: var(--text-primary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-inset);
+}
+
+/* Destructive actions. Needed as a class because `text-danger` on a .btn-ghost
+   is overridden by .btn-ghost's own unlayered colour, so the Delete button was
+   rendering in plain white with no danger cue at all. */
+.btn-danger {
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fda4af;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.2);
+  border-color: rgba(244, 63, 94, 0.55);
+}
+
+.btn-quiet {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: var(--bg-inset);
+  color: var(--text-primary);
 }
 
 button,
 .btn,
 .btn-primary,
 .btn-accent,
-.btn-ghost {
+.btn-ghost,
+.btn-quiet,
+.btn-danger {
   cursor: pointer;
   user-select: none;
-  transition:
-    transform 0.14s ease,
-    box-shadow 0.14s ease,
-    filter 0.14s ease,
-    background-color 0.14s ease;
 }
 
-button:hover:not(:disabled),
-.btn:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled),
+.btn-accent:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.btn-ghost:hover:not(:disabled),
+.btn-quiet:hover:not(:disabled) {
   transform: translateY(-1px);
-  filter: brightness(1.05);
 }
 
 button:active:not(:disabled),
 .btn:active:not(:disabled) {
   transform: scale(0.97);
-  filter: brightness(0.95);
 }
 
-button:disabled {
+button:disabled,
+.btn:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.55;
+  transform: none;
 }
 
+/* visible focus ring on every interactive element (a11y) */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--violet-solid);
+  outline-offset: 2px;
+}
+
+/* inputs: --bg-inset, borderless at rest, violet border + ring on focus */
 .field {
-  @apply w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:shadow-glow;
+  width: 100%;
+  background: var(--bg-inset);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--ease), box-shadow var(--ease), background-color var(--ease);
 }
 
-.label {
-  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500;
+/* Fields that carry a leading / trailing icon.
+   The icon is absolutely positioned at left-3 (12px) and is 16px wide, so the
+   text has to start past 28px or it renders underneath the icon.
+   These MUST stay in this file (unlayered, after .field) rather than being done
+   with a `pl-*` utility: .field sets `padding` as an unlayered rule, which wins
+   over Tailwind's layered utilities, so `field pl-9` is silently ignored. */
+.field-icon {
+  padding-left: 36px;
 }
+.field-icon-end {
+  padding-right: 56px;
+}
+.field-icon::-webkit-search-cancel-button {
+  margin-right: 4px;
+}
+
+.field::placeholder {
+  color: var(--text-muted);
+}
+
+.field:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.field:focus {
+  border-color: var(--violet-solid);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+  background: #33334a;
+}
+
+.field:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.field[aria-invalid="true"],
+.field.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.18);
+}
+
+select.field {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 13px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+
+select.field option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+textarea.field {
+  min-height: 96px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+input[type="date"].field::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.5);
+  cursor: pointer;
+}
+
+/* labels: 12px / 600 / uppercase / 1.5px tracking */
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+}
+
+.field-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.field-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------- badges */
 
 .badge {
-  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  border: 1px solid transparent;
+  white-space: nowrap;
 }
+
+.badge-success {
+  background: rgba(52, 211, 153, 0.14);
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.28);
+}
+.badge-danger {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.3);
+}
+.badge-warning {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fcd34d;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+.badge-violet {
+  background: rgba(139, 92, 246, 0.16);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.32);
+}
+.badge-coral {
+  background: rgba(247, 107, 107, 0.16);
+  color: #fca5a5;
+  border-color: rgba(247, 107, 107, 0.32);
+}
+.badge-neutral {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  border-color: var(--stroke);
+}
+
+/* ---------------------------------------------------------------- tables */
+
+.table-wrap {
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-card);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+/* transparent header row, 12px uppercase muted labels */
+table.data th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(38, 38, 51, 0.86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--stroke);
+  white-space: nowrap;
+}
+
+table.data td {
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+table.data td strong,
+table.data td b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* rows lift to --bg-inset on hover */
+table.data tbody tr {
+  transition: background-color var(--ease);
+}
+
+table.data tbody tr:hover {
+  background: var(--bg-inset);
+}
+
+/* row actions: ghost icon buttons, revealed on hover */
+.row-actions {
+  display: inline-flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity var(--ease);
+}
+
+table.data tbody tr:hover .row-actions,
+table.data tbody tr:focus-within .row-actions,
+.row-actions:focus-within {
+  opacity: 1;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  height: 30px;
+  width: 30px;
+  border-radius: 9px;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  transition: all var(--ease);
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  border-color: var(--stroke);
+}
+
+/* tables become stacked cards below 640px, primary field as card title */
+@media (max-width: 640px) {
+  .table-wrap {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    overflow: visible;
+  }
+
+  table.data,
+  table.data thead,
+  table.data tbody,
+  table.data tr,
+  table.data td {
+    display: block;
+    width: 100%;
+  }
+
+  table.data thead {
+    display: none;
+  }
+
+  table.data tbody tr {
+    background: var(--bg-elevated);
+    border: 1px solid var(--stroke);
+    border-radius: 16px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  table.data td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 7px 0;
+    border-top: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: right;
+  }
+
+  table.data td:last-child {
+    border-bottom: 0;
+  }
+
+  table.data td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  /* the first cell becomes the card title */
+  table.data td[data-primary="true"] {
+    display: block;
+    text-align: left;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: 10px;
+  }
+
+  table.data td[data-primary="true"]::before {
+    display: none;
+  }
+
+  table.data td[data-empty="true"]::before,
+  table.data td::before:empty {
+    display: none;
+  }
+
+  .row-actions {
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------- signature motifs */
+
+/* floating mini-card with a 3-dot window header */
+.mini-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.mini-card-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mini-dot {
+  height: 6px;
+  width: 6px;
+  border-radius: 999px;
+}
+
+/* dashed cloud outlines — decorative background corners */
+.dashed-cloud {
+  position: absolute;
+  border: 2px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* thin connector line ending in a glowing dot */
+.connector {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.connector::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 7px;
+  width: 7px;
+  border-radius: 999px;
+  background: var(--violet-solid);
+  box-shadow: 0 0 12px 3px rgba(139, 92, 246, 0.75);
+}
+
+.connector-coral::after {
+  background: var(--coral-solid);
+  box-shadow: 0 0 12px 3px rgba(247, 107, 107, 0.75);
+}
+
+/* activity timeline with glowing dots */
+.timeline {
+  position: relative;
+  padding-left: 26px;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 18px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -24px;
+  top: 5px;
+  height: 9px;
+  width: 9px;
+  border-radius: 999px;
+  background: var(--violet-solid);
+  box-shadow: 0 0 10px 2px rgba(139, 92, 246, 0.7);
+}
+
+.timeline-dot.is-coral {
+  background: var(--coral-solid);
+  box-shadow: 0 0 10px 2px rgba(247, 107, 107, 0.7);
+}
+
+.timeline-dot.is-success {
+  background: var(--success);
+  box-shadow: 0 0 10px 2px rgba(52, 211, 153, 0.7);
+}
+
+.timeline-dot.is-muted {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- states */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-inset) 0%,
+    rgba(255, 255, 255, 0.07) 40%,
+    var(--bg-inset) 80%
+  );
+  background-size: 600px 100%;
+  border-radius: 10px;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.empty-state {
+  border: 2px dashed rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-card);
+  padding: 40px 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nav-active-bar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 22px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--grad-violet);
+  box-shadow: 0 0 12px 2px rgba(139, 92, 246, 0.85);
+}
+
+.notif-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  height: 9px;
+  width: 9px;
+  border-radius: 999px;
+  background: var(--coral-solid);
+  box-shadow: 0 0 0 2px var(--bg-elevated), 0 0 10px 2px rgba(247, 107, 107, 0.8);
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------ animations */
 
 .amp-fade > * {
   animation: fadeUp 0.45s ease both;
@@ -118,29 +791,130 @@ button:disabled {
 .amp-fade > *:nth-child(4) {
   animation-delay: 0.18s;
 }
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.amp-fade > *:nth-child(5) {
+  animation-delay: 0.24s;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .amp-fade > * {
-    animation: none;
-  }
+/* ------------------------------------------------------- print / export */
+
+/* light-on-white print document surface, same type + accents */
+.paper {
+  background: #ffffff;
+  color: #1f2430;
+  border: 1px solid #dfe2ea;
+  border-radius: 16px;
+  padding: 40px;
+}
+
+.paper-accent-rule {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7b3fe4 0%, #a855f7 55%, #f43f5e 100%);
+}
+
+.paper h1,
+.paper h2,
+.paper h3 {
+  color: #12141c;
+}
+
+.paper-muted {
+  color: #5b6070;
+}
+
+.paper-rule {
+  border-color: #dfe2ea;
+}
+
+.paper-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f4f2fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+.paper-danger {
+  color: #be123c;
+}
+
+.paper-success {
+  color: #047857;
 }
 
 @media print {
   .no-print {
     display: none !important;
   }
+
   body {
-    background: white;
+    background: #fff !important;
+  }
+
+  body::before {
+    display: none !important;
+  }
+
+  .paper {
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .paper-accent-rule,
+  .paper-chip {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-avoid-break,
+  .paper tr {
+    page-break-inside: avoid;
+  }
+}
+
+/* ------------------------------------------------- accessible + motion */
+
+/* AA-safe secondary text on dark surfaces */
+@supports not (color: color-mix(in srgb, white, black)) {
+  :root {
+    --text-secondary: #b8b8cc;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .amp-fade > * {
+    animation: none;
+  }
+
+  button:hover:not(:disabled),
+  .btn:hover:not(:disabled),
+  .btn-primary:hover:not(:disabled),
+  .btn-accent:hover:not(:disabled),
+  .btn-ghost:hover:not(:disabled) {
+    transform: none;
+    filter: none;
+  }
+
+  body::before {
+    filter: none;
+    opacity: 0.5;
   }
 }

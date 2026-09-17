@@ -91,7 +91,7 @@ export default function SessionsPage() {
         hint="Every lecture and assignment is stored by date and name. Filter, then open a session to see the saved roll."
       />
 
-      <div className="no-print mb-6 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-4">
+      <div className="no-print mb-6 grid gap-3 glass p-4 md:grid-cols-4">
         <SearchSelect
           label="Branch"
           value={branch}
@@ -134,7 +134,7 @@ export default function SessionsPage() {
           </button>
         </div>
       </div>
-      {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="table-wrap lg:col-span-2">
@@ -173,7 +173,7 @@ export default function SessionsPage() {
           </table>
         </div>
 
-        <div className="rounded-2xl border border-ink-100 bg-white p-4 lg:col-span-3">
+        <div className="glass p-4 lg:col-span-3">
           {!detail ? (
             <p className="text-sm text-ink-500">Click a session name to view the saved attendance or marks.</p>
           ) : detail.kind === "attendance" ? (

@@ -49,7 +49,7 @@ export default function MlPage() {
         }
       />
 
-      <div className="mb-6 rounded-2xl border border-ink-100 bg-white p-5 text-sm text-ink-700">
+      <div className="mb-6 glass p-5 text-sm text-ink-700">
         <p className="font-semibold text-ink-900">How it works (viva)</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>
@@ -71,7 +71,7 @@ export default function MlPage() {
           ["Precision", model ? `${model.precision}%` : "–"],
           ["Recall / F1", model ? `${model.recall}% / ${model.f1}%` : "–"]
         ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
+          <div key={String(label)} className="glass p-4 shadow-card">
             <p className="text-xs uppercase tracking-wide text-ink-500">{label}</p>
             <p className="font-display mt-1 text-2xl">{value}</p>
           </div>
@@ -79,7 +79,7 @@ export default function MlPage() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-ink-100 bg-white p-5">
+        <section className="glass p-5">
           <h2 className="font-display text-xl">Confusion matrix (test set)</h2>
           <p className="mt-1 text-xs text-ink-500">Predicted at-risk if probability ≥ 0.5</p>
           <table className="data mt-3">
@@ -105,7 +105,7 @@ export default function MlPage() {
           </table>
         </section>
 
-        <section className="rounded-2xl border border-ink-100 bg-white p-5">
+        <section className="glass p-5">
           <h2 className="font-display text-xl">Learned weights</h2>
           <p className="mt-1 text-xs text-ink-500">Larger weight → that gap pushes probability of at-risk up</p>
           <table className="data mt-3">
@@ -141,7 +141,7 @@ export default function MlPage() {
         </section>
       </div>
 
-      <section className="mt-6 rounded-2xl border border-ink-100 bg-white p-5">
+      <section className="mt-6 glass p-5">
         <h2 className="font-display text-xl">K-means clusters (k = 3)</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           {clusters.map((c) => (
@@ -156,7 +156,7 @@ export default function MlPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-2xl border border-ink-100 bg-white p-5">
+      <section className="mt-6 glass p-5">
         <h2 className="font-display text-xl">Top scored students</h2>
         <div className="table-wrap mt-3">
           <table className="data">

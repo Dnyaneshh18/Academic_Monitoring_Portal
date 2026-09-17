@@ -60,7 +60,7 @@ export function SearchSelect({
         }}
       />
       {open ? (
-        <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-ink-100 bg-white py-1 shadow-lg">
+        <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-auto glass py-1 shadow-lg">
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-sm text-ink-500">
               {options.length === 0 ? "Nothing allotted yet" : "No match"}

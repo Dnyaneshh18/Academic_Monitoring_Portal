@@ -53,7 +53,7 @@ export default function FacultyPage() {
   return (
     <div>
       <PageHeader kicker="Staff" title="Faculty" />
-      <div className="mb-6 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-4">
+      <div className="mb-6 grid gap-3 glass p-4 md:grid-cols-4">
         <input className="field" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input className="field" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <input className="field" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />

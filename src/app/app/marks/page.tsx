@@ -267,7 +267,7 @@ export default function MarksPage() {
         hint="Create for an allotted class (CE Div A · B1 etc.). Title + date are stored so you can open it later."
       />
 
-      <div className="mb-6 rounded-2xl border border-ink-100 bg-white p-4">
+      <div className="mb-6 glass p-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-500">New assessment</p>
         <div className="grid gap-3 md:grid-cols-4">
           <SearchSelect label="Branch" value={branch} onChange={pickBranch} options={branches} placeholder="Search CE, IT…" />
@@ -369,10 +369,10 @@ export default function MarksPage() {
           </div>
         </div>
         {msg ? <p className="mt-3 text-sm text-brand-700">{msg}</p> : null}
-        {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
+        {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
       </div>
 
-      <div className="mb-4 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-4">
+      <div className="mb-4 grid gap-3 glass p-4 md:grid-cols-4">
         <div>
           <label className="label">Find by date</label>
           <input className="field" type="date" value={findDate} onChange={(e) => setFindDate(e.target.value)} />
@@ -467,16 +467,16 @@ export default function MarksPage() {
       </div>
 
       {students.length ? (
-        <div className="sticky bottom-4 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-brand-200 bg-white p-4 shadow-card">
+        <div className="sticky bottom-4 z-20 mt-4 flex flex-wrap items-center gap-3 panel border-brand-200/40 p-4 shadow-glass">
           <div>
             <p className="font-semibold text-ink-900">After entering obtained marks, save them</p>
             <p className="text-sm text-ink-600">
               {current ? `${current.title} · out of ${current.max_marks}` : "No assessment open"}
             </p>
             {saveMsg ? <p className="mt-1 text-sm text-brand-700">{saveMsg}</p> : null}
-            {error ? <p className="mt-1 text-sm text-rose-700">{error}</p> : null}
+            {error ? <p className="mt-1 text-sm text-danger">{error}</p> : null}
           </div>
-          <button className="btn-accent ml-auto px-8 py-3 text-base" onClick={save} disabled={!assessmentId || saving}>
+          <button className="btn-accent btn-lg ml-auto" onClick={save} disabled={!assessmentId || saving}>
             {saving ? "Saving marks…" : "Save marks"}
           </button>
         </div>

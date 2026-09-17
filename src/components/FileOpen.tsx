@@ -53,7 +53,7 @@ export function FileOpen({
         <button type="button" className="text-xs text-ink-500 underline" onClick={() => open(true)}>
           Download
         </button>
-        {err ? <span className="text-xs text-rose-700">{err}</span> : null}
+        {err ? <span className="text-xs text-danger">{err}</span> : null}
       </span>
       {viewer ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/70 p-4">
@@ -63,7 +63,7 @@ export function FileOpen({
               Download
             </button>
             <button
-              className="btn-ghost bg-white"
+              className="btn-ghost"
               type="button"
               onClick={() => {
                 URL.revokeObjectURL(viewer.url);
@@ -73,7 +73,7 @@ export function FileOpen({
               Close
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden rounded-xl bg-white">
+          <div className="min-h-0 flex-1 overflow-hidden rounded-xl bg-elevated">
             {viewer.type.startsWith("image/") ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={viewer.url} alt={viewer.name} className="mx-auto max-h-full" />

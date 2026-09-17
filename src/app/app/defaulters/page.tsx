@@ -130,7 +130,7 @@ export default function DefaultersPage() {
         }
       />
 
-      <div className="no-print mb-6 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-6">
+      <div className="no-print mb-6 grid gap-3 glass p-4 md:grid-cols-6">
         <div>
           <label className="label">Branch</label>
           <select
@@ -195,7 +195,7 @@ export default function DefaultersPage() {
           </button>
         </div>
       </div>
-      {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
 
       <div className="paper mb-4 rounded-2xl border border-ink-100 p-4">
         <p className="text-xs uppercase tracking-wide text-brand-700">Vishwakarma Institute of Technology, Pune</p>
@@ -233,7 +233,7 @@ export default function DefaultersPage() {
                 <td>
                   {r.present}/{r.total}
                 </td>
-                <td className="font-semibold text-rose-700">{r.percent}%</td>
+                <td className="font-semibold text-danger">{r.percent}%</td>
                 <td>{r.marksPct != null ? `${r.marksPct}%` : "null"}</td>
               </tr>
             ))}

@@ -35,7 +35,7 @@ export default function AcademicsPage() {
       <PageHeader kicker="Structure" title="Classes & subjects" />
       {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
 
-      <section className="mb-6 rounded-2xl border border-ink-100 bg-white p-5">
+      <section className="mb-6 glass p-5">
         <h2 className="font-display text-xl">New department / branch</h2>
         <p className="mt-1 text-sm text-ink-600">College admins add branches for their own campus only.</p>
         <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -56,7 +56,7 @@ export default function AcademicsPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-ink-100 bg-white p-5">
+        <section className="glass p-5">
           <h2 className="font-display text-xl">New class</h2>
           <div className="mt-3 grid gap-2">
             <input className="field" placeholder="Name e.g. SE-IT-B" value={cls.name} onChange={(e) => setCls({ ...cls, name: e.target.value })} />
@@ -113,7 +113,7 @@ export default function AcademicsPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-ink-100 bg-white p-5">
+        <section className="glass p-5">
           <h2 className="font-display text-xl">New subject</h2>
           <div className="mt-3 grid gap-2">
             <input className="field" placeholder="Code" value={sub.code} onChange={(e) => setSub({ ...sub, code: e.target.value })} />

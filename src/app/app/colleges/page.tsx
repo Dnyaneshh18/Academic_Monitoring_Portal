@@ -48,9 +48,9 @@ export default function CollegesPage() {
         hint="Add a college and its admin. That person signs in and manages only that college’s students, faculty and records. You stay here and manage the admins."
       />
       {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
-      {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
 
-      <div className="mb-6 rounded-2xl border border-ink-100 bg-white p-4">
+      <div className="mb-6 glass p-4">
         <h2 className="font-display text-xl">New college</h2>
         <p className="mt-1 text-sm text-ink-600">Creates the campus and its first college admin in one step.</p>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -103,7 +103,7 @@ export default function CollegesPage() {
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-ink-100 bg-white p-4">
+      <div className="mb-6 glass p-4">
         <h2 className="font-display text-xl">Add another admin to an existing college</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           <select className="field" value={extra.collegeId} onChange={(e) => setExtra({ ...extra, collegeId: e.target.value })}>

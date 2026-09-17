@@ -160,7 +160,7 @@ export default function ManagePage() {
         hint="Add records from Students / Faculty / Classes pages. Here you can edit or permanently delete anything."
       />
       {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
-      {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
@@ -181,7 +181,7 @@ export default function ManagePage() {
       </div>
 
       {edit ? (
-        <div className="mb-4 grid gap-2 rounded-2xl border border-brand-200 bg-white p-4 md:grid-cols-4">
+        <div className="mb-4 grid gap-2 glass border-brand-200/40 p-4 md:grid-cols-4">
           <p className="md:col-span-4 text-sm font-semibold">Edit record</p>
           {["name", "email", "phone", "prn", "roll_no", "batch", "parent_email", "guardian_name", "title", "designation", "due_date", "max_marks"].map(
             (k) =>
@@ -229,7 +229,7 @@ export default function ManagePage() {
                       Edit
                     </button>
                   ) : null}
-                  <button className="btn-ghost text-xs text-rose-700" onClick={() => remove(String(r.id))}>
+                  <button className="btn-danger btn-sm ml-1" onClick={() => remove(String(r.id))}>
                     Delete
                   </button>
                 </td>

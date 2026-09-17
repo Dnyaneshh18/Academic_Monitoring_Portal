@@ -96,7 +96,7 @@ export default function MentoringPage() {
       />
 
       {user?.role !== "STUDENT" ? (
-        <div className="mb-6 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-2">
+        <div className="mb-6 grid gap-3 glass p-4 md:grid-cols-2">
           <select
             className="field"
             value={form.studentId}
@@ -117,8 +117,8 @@ export default function MentoringPage() {
             </select>
           </div>
           {selected?.suggestion ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm md:col-span-2">
-              <p className="font-semibold text-amber-900">
+            <div className="rounded-xl border border-warning/40 bg-warning/[0.08] p-3 text-sm md:col-span-2">
+              <p className="font-semibold text-warning">
                 ML suggestion · {selected.level} · {selected.reasons.join(" · ")}
               </p>
               <p className="mt-1 text-ink-700">{selected.suggestion.note}</p>
@@ -157,7 +157,7 @@ export default function MentoringPage() {
 
       <div className="space-y-3">
         {notes.map((n) => (
-          <article key={n.id} className="rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
+          <article key={n.id} className="glass p-5 shadow-card">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold">
                 {n.student_name}{" "}
@@ -165,7 +165,7 @@ export default function MentoringPage() {
                   ({n.class_name} · {n.roll_no})
                 </span>
               </p>
-              <span className="badge bg-ink-100 text-ink-800">{n.category}</span>
+              <span className="badge badge-neutral">{n.category}</span>
             </div>
             <p className="mt-2 text-sm text-ink-700">{n.note}</p>
             <p className="mt-3 text-xs text-ink-500">

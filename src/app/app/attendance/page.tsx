@@ -242,7 +242,7 @@ export default function AttendancePage() {
                     <td>{r.present}</td>
                     <td>{r.total}</td>
                     <td>
-                      <span className={`badge ${pct < 75 ? "bg-rose-100 text-rose-800" : "bg-brand-100 text-brand-800"}`}>
+                      <span className={`badge ${pct < 75 ? "badge badge-danger" : "bg-brand-100 text-brand-800"}`}>
                         {pct}%
                       </span>
                     </td>
@@ -273,7 +273,7 @@ export default function AttendancePage() {
         title="Attendance"
         hint="Search your allotted branch — CE loads DSA, IT loads Computer Networks. Then mark and save."
       />
-      <div className="mb-4 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-6">
+      <div className="mb-4 grid gap-3 glass p-4 md:grid-cols-6">
         <SearchSelect
           label="Branch"
           value={branch}
@@ -351,7 +351,7 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-ink-100 bg-white p-4">
+      <div className="mb-6 glass p-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-500">Mark this lecture</p>
         <div className="grid gap-2 md:grid-cols-2">
           {(matrix?.students || []).map((s) => (
@@ -404,7 +404,7 @@ export default function AttendancePage() {
                       </td>
                     );
                   })}
-                  <td className={pct < 75 ? "font-semibold text-rose-700" : ""}>{pct}%</td>
+                  <td className={pct < 75 ? "font-semibold text-danger" : ""}>{pct}%</td>
                 </tr>
               );
             })}

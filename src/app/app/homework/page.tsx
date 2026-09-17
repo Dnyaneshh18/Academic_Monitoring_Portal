@@ -216,10 +216,10 @@ export default function HomeworkPage() {
       <div>
         <PageHeader kicker="My work" title="Assignments" hint="Upload PDF, Word, PPT, Excel, images or ZIP before the due date." />
         {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
-        {error && !/request failed/i.test(error) ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+        {error && !/request failed/i.test(error) ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
         <div className="space-y-3">
           {tasks.map((t) => (
-            <article key={t.id} className="rounded-2xl border border-ink-100 bg-white p-4">
+            <article key={t.id} className="glass p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h2 className="font-display text-xl">{t.title}</h2>
@@ -234,7 +234,7 @@ export default function HomeworkPage() {
                     </div>
                   ) : null}
                 </div>
-                <span className={`badge ${t.submission_id ? "bg-brand-100 text-brand-800" : "bg-amber-100 text-amber-900"}`}>
+                <span className={`badge ${t.submission_id ? "bg-brand-100 text-brand-800" : "badge badge-warning"}`}>
                   {t.submission_id ? (t.verified ? `Verified · ${t.obtained}/${t.max_marks}` : "Submitted") : "Not submitted"}
                 </span>
               </div>
@@ -264,12 +264,12 @@ export default function HomeworkPage() {
         hint="Create for a division or a lab batch. Students upload files. Verify all awards full marks only to those who submitted."
       />
       {msg ? <p className="mb-3 text-sm text-brand-700">{msg}</p> : null}
-      {error && !/request failed/i.test(error) ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+      {error && !/request failed/i.test(error) ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
       {allotments.length === 0 ? (
         <p className="mb-3 text-sm text-ink-500">No class is allotted to you yet. Ask your HOD / college admin to assign a subject.</p>
       ) : null}
 
-      <div className="mb-6 grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 md:grid-cols-4">
+      <div className="mb-6 grid gap-3 glass p-4 md:grid-cols-4">
         <div>
           <label className="label">Branch</label>
           <select
@@ -403,7 +403,7 @@ export default function HomeworkPage() {
       </div>
 
       {detail ? (
-        <section className="rounded-2xl border border-ink-100 bg-white p-4">
+        <section className="glass p-4">
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <h2 className="font-display text-2xl">{detail.task.title}</h2>
             <button className="btn-accent ml-auto" onClick={verifyAll}>

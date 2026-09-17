@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# local portal data — never publish or overwrite
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/uploads/
+!data/.gitkeep
+
+# secrets
+.env
+.env*.local
+
+# generated copy-script: it embeds .env (Gmail app password, DB password).
+# Regenerate locally with: node scripts/make-write-portal.mjs
+public/write-portal.ps1
+
+# editor / os
+.DS_Store
+Thumbs.db
+*.log

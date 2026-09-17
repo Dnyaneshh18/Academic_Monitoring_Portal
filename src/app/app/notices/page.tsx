@@ -30,7 +30,7 @@ export default function NoticesPage() {
     <div>
       <PageHeader kicker="Circulars" title="Notice board" />
       {user?.role !== "STUDENT" ? (
-        <div className="mb-6 space-y-3 rounded-2xl border border-ink-100 bg-white p-4">
+        <div className="mb-6 space-y-3 glass p-4">
           <input className="field" placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <textarea className="field" rows={3} placeholder="Body" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
           <div className="flex flex-wrap gap-3">
@@ -58,7 +58,7 @@ export default function NoticesPage() {
       ) : null}
       <div className="space-y-3">
         {rows.map((n) => (
-          <article key={n.id} className="rounded-2xl border border-ink-100 bg-white p-5">
+          <article key={n.id} className="glass p-5">
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-display text-xl">{n.title}</h3>
               {n.pinned ? <span className="badge bg-gold-400/40 text-ink-900">Pinned</span> : null}

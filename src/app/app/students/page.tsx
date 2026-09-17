@@ -240,7 +240,7 @@ export default function StudentsPage() {
       ) : null}
 
       {addOpen ? (
-        <div className="mb-6 rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
+        <div className="mb-6 glass p-5 shadow-card">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-xl">Add student manually</h2>
             <button className="btn-ghost text-sm" onClick={() => setAddOpen(false)}>
@@ -291,12 +291,12 @@ export default function StudentsPage() {
             </button>
           </div>
           {msg ? <p className="mt-3 text-sm text-brand-700">{msg}</p> : null}
-          {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
+          {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
         </div>
       ) : null}
 
       {open ? (
-        <div className="mb-6 rounded-2xl border border-brand-200 bg-white p-5 shadow-card">
+        <div className="mb-6 glass border-brand-200/40 p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-xl">Import students</h2>
             <button className="btn-ghost text-sm" onClick={() => setOpen(false)}>
@@ -348,7 +348,7 @@ export default function StudentsPage() {
           </div>
           {busy ? <p className="mt-3 text-sm text-ink-500">Working…</p> : null}
           {msg ? <p className="mt-3 text-sm text-brand-700">{msg}</p> : null}
-          {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
+          {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
           {preview.length ? (
             <>
               <div className="mt-4 table-wrap max-h-64">
@@ -437,7 +437,7 @@ function SetupCollege({ onDone }: { onDone: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
 
   return (
-    <div className="mb-6 rounded-2xl border border-brand-200 bg-white p-5 shadow-card">
+    <div className="mb-6 glass border-brand-200/40 p-5">
       <h2 className="font-display text-xl">Set up your college first</h2>
       <p className="mt-1 text-sm text-ink-600">
         New colleges start empty. Create a branch and one division, then you can add students by hand or import a list.
@@ -502,7 +502,7 @@ function SetupCollege({ onDone }: { onDone: () => Promise<void> }) {
       >
         Create branch + division
       </button>
-      {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
     </div>
   );
 }
