@@ -34,6 +34,16 @@ export function getDb(): DatabaseSync {
       /* exists */
     }
     try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_tasks ADD COLUMN brief_data BLOB");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN file_data BLOB");
+    } catch {
+      /* exists */
+    }
+    try {
       globalForDb.ampDb.exec(`
         CREATE TABLE IF NOT EXISTS ml_scores (
           student_id TEXT PRIMARY KEY,
@@ -108,6 +118,8 @@ async function syncPostgres(db: DatabaseSync) {
       await pool.query("ALTER TABLE notices ADD COLUMN IF NOT EXISTS college_id TEXT");
       await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS brief_name TEXT");
       await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS brief_path TEXT");
+      await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS brief_data BYTEA");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS file_data BYTEA");
     } catch {
       /* older pg */
     }
@@ -367,6 +379,7 @@ function migrate(db: DatabaseSync) {
       due_date TEXT,
       brief_name TEXT,
       brief_path TEXT,
+      brief_data BLOB,
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS homework_submissions (
@@ -375,6 +388,7 @@ function migrate(db: DatabaseSync) {
       student_id TEXT NOT NULL,
       file_name TEXT NOT NULL,
       stored_path TEXT NOT NULL,
+      file_data BLOB,
       mime TEXT,
       size INTEGER,
       submitted_at TEXT DEFAULT (datetime('now')),

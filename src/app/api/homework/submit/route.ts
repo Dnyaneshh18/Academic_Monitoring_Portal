@@ -54,11 +54,15 @@ export async function POST(req: NextRequest) {
   if (file.size > 15 * 1024 * 1024) return json({ error: "File must be under 15 MB" }, 400);
 
   const safe = (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
-  const dir = path.join(process.cwd(), "data", "uploads", taskId);
-  fs.mkdirSync(dir, { recursive: true });
   const stored = `${st.id}-${uid("f_")}${ext}`;
-  const storedPath = path.join(dir, stored);
-  fs.writeFileSync(storedPath, Buffer.from(await file.arrayBuffer()));
+  const fileData = Buffer.from(await file.arrayBuffer());
+  const dir = path.join(process.cwd(), "data", "uploads", taskId);
+  let storedPath = "";
+  if (!process.env.VERCEL) {
+    fs.mkdirSync(dir, { recursive: true });
+    storedPath = path.join(dir, stored);
+    fs.writeFileSync(storedPath, fileData);
+  }
 
   const existing = one<{ id: string; stored_path: string }>(
     "SELECT id, stored_path FROM homework_submissions WHERE task_id = ? AND student_id = ?",
@@ -71,15 +75,15 @@ export async function POST(req: NextRequest) {
       /* ignore */
     }
     run(
-      `UPDATE homework_submissions SET file_name = ?, stored_path = ?, mime = ?, size = ?, submitted_at = datetime('now'), verified = 0, obtained = NULL
+      `UPDATE homework_submissions SET file_name = ?, stored_path = ?, file_data = ?, mime = ?, size = ?, submitted_at = datetime('now'), verified = 0, obtained = NULL
        WHERE id = ?`,
-      [safe, storedPath, file.type || null, file.size, existing.id]
+      [safe, storedPath, fileData, file.type || null, file.size, existing.id]
     );
   } else {
     run(
-      `INSERT INTO homework_submissions (id, task_id, student_id, file_name, stored_path, mime, size)
-       VALUES (?,?,?,?,?,?,?)`,
-      [uid("hs_"), taskId, st.id, safe, storedPath, file.type || null, file.size]
+      `INSERT INTO homework_submissions (id, task_id, student_id, file_name, stored_path, file_data, mime, size)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [uid("hs_"), taskId, st.id, safe, storedPath, fileData, file.type || null, file.size]
     );
   }
   return json({ ok: true });

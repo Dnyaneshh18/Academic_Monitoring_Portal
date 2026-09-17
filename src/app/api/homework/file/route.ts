@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
     task_id: string;
     file_name: string;
     stored_path: string;
+    file_data: Buffer | null;
     mime: string;
   }>("SELECT * FROM homework_submissions WHERE id = ?", [id]);
   if (!sub) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -32,9 +33,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (!fs.existsSync(sub.stored_path)) return NextResponse.json({ error: "File missing" }, { status: 404 });
-  const buf = fs.readFileSync(sub.stored_path);
-  return new NextResponse(buf, {
+  const buf = sub.file_data || (sub.stored_path && fs.existsSync(sub.stored_path) ? fs.readFileSync(sub.stored_path) : null);
+  if (!buf) return NextResponse.json({ error: "File missing" }, { status: 404 });
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": sub.mime || "application/octet-stream",
       "Content-Disposition": `attachment; filename="${sub.file_name.replace(/"/g, "")}"`

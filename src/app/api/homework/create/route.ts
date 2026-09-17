@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   const id = uid("hw_");
   let briefName: string | null = null;
   let briefPath: string | null = null;
+  let briefData: Buffer | null = null;
   if (file instanceof File && file.size > 0) {
     const ext = path.extname(file.name || "").toLowerCase();
     if (!ALLOWED.has(ext)) return json({ error: "Assignment file: PDF, Word, PPT, Excel, image, TXT or ZIP" }, 400);
@@ -46,14 +47,18 @@ export async function POST(req: NextRequest) {
     const dir = path.join(process.cwd(), "data", "uploads", "briefs");
     fs.mkdirSync(dir, { recursive: true });
     briefName = (file.name || "assignment.pdf").replace(/[^a-zA-Z0-9._-]/g, "_");
-    briefPath = path.join(dir, `${id}${ext}`);
-    fs.writeFileSync(briefPath, Buffer.from(await file.arrayBuffer()));
+    briefData = Buffer.from(await file.arrayBuffer());
+    if (!process.env.VERCEL) {
+      briefPath = path.join(dir, `${id}${ext}`);
+      fs.writeFileSync(briefPath, briefData);
+      briefData = null;
+    }
   }
 
   run(
-    `INSERT INTO homework_tasks (id, faculty_id, subject_id, class_id, batch, title, instructions, max_marks, due_date, brief_name, brief_path)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, user.facultyId, subjectId, sub.class_id, batch, title, instructions, maxMarks, dueDate, briefName, briefPath]
+    `INSERT INTO homework_tasks (id, faculty_id, subject_id, class_id, batch, title, instructions, max_marks, due_date, brief_name, brief_path, brief_data)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, user.facultyId, subjectId, sub.class_id, batch, title, instructions, maxMarks, dueDate, briefName, briefPath, briefData]
   );
   await flushPgWrites();
   return json({ id });

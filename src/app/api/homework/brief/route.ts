@@ -18,8 +18,9 @@ export async function GET(req: NextRequest) {
     batch: string | null;
     brief_name: string | null;
     brief_path: string | null;
+    brief_data: Buffer | null;
   }>("SELECT * FROM homework_tasks WHERE id = ?", [id]);
-  if (!task?.brief_path) return NextResponse.json({ error: "No assignment file" }, { status: 404 });
+  if (!task?.brief_path && !task?.brief_data) return NextResponse.json({ error: "No assignment file" }, { status: 404 });
 
   if (user.role === "STUDENT") {
     const st = one<{ id: string; class_id: string; batch: string }>(
@@ -34,11 +35,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (!fs.existsSync(task.brief_path)) return NextResponse.json({ error: "File missing" }, { status: 404 });
-  const buf = fs.readFileSync(task.brief_path);
+  const buf = task.brief_data || (task.brief_path && fs.existsSync(task.brief_path) ? fs.readFileSync(task.brief_path) : null);
+  if (!buf) return NextResponse.json({ error: "File missing" }, { status: 404 });
   const name = task.brief_name || "assignment.pdf";
   const inline = req.nextUrl.searchParams.get("inline") === "1" || name.toLowerCase().endsWith(".pdf") || name.toLowerCase().match(/\.(png|jpg|jpeg|gif)$/);
-  return new NextResponse(buf, {
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": name.toLowerCase().endsWith(".pdf")
         ? "application/pdf"

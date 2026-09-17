@@ -341,6 +341,7 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
   due_date TEXT,
   brief_name TEXT,
   brief_path TEXT,
+  brief_data BYTEA,
   created_at TEXT DEFAULT (NOW()::text)
 );
 CREATE TABLE IF NOT EXISTS homework_submissions (
@@ -349,6 +350,7 @@ CREATE TABLE IF NOT EXISTS homework_submissions (
   student_id TEXT NOT NULL,
   file_name TEXT NOT NULL,
   stored_path TEXT NOT NULL,
+  file_data BYTEA,
   mime TEXT,
   size INTEGER,
   submitted_at TEXT DEFAULT (NOW()::text),
