@@ -11,7 +11,7 @@ export async function GET() {
   const sqliteUsers = one<{ c: number }>("SELECT COUNT(*) as c FROM users");
   const counts = pool ? await pgTableCounts() : null;
   return json({
-    version: "fd12ba7",
+    version: process.env.VERCEL_GIT_COMMIT_SHA || "local",
     postgres: {
       url: postgresUrl().replace(/:[^:@/]+@/, ":****@"),
       connected: pgConnected() && Boolean(pool),
