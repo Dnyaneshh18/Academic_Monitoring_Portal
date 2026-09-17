@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (isResponse(user)) return user;
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-  const sub = one<{
+  let sub = one<{
     id: string;
     student_id: string;
     task_id: string;
@@ -22,6 +22,10 @@ export async function GET(req: NextRequest) {
     file_data: Buffer | null;
     mime: string;
   }>("SELECT * FROM homework_submissions WHERE id = ?", [id]);
+  if (!sub) {
+    const pgSub = await pgQuery("SELECT id, student_id, task_id, file_name, stored_path, file_data, mime FROM homework_submissions WHERE id = ?", [id]);
+    sub = pgSub?.rows[0] as typeof sub;
+  }
   if (!sub) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (user.role === "STUDENT") {

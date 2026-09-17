@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const user = await requireUser();
   if (isResponse(user)) return user;
   const id = req.nextUrl.searchParams.get("id");
-  const task = one<{
+  let task = one<{
     id: string;
     faculty_id: string;
     class_id: string;
@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
     brief_path: string | null;
     brief_data: Buffer | null;
   }>("SELECT * FROM homework_tasks WHERE id = ?", [id]);
+  if (!task) {
+    const pgTask = await pgQuery("SELECT id, faculty_id, class_id, batch, brief_name, brief_path, brief_data FROM homework_tasks WHERE id = ?", [id]);
+    task = pgTask?.rows[0] as typeof task;
+  }
   if (!task) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
 
   if (user.role === "STUDENT") {
