@@ -63,6 +63,7 @@ export default function HomeworkPage() {
   const [error, setError] = useState("");
   const [file, setFile] = useState<Record<string, File | null>>({});
   const [brief, setBrief] = useState<File | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const selected = useMemo(
     () =>
@@ -151,6 +152,7 @@ export default function HomeworkPage() {
     fd.append("dueDate", form.dueDate);
     if (brief) fd.append("brief", brief);
     try {
+      setPublishing(true);
       await apiForm("/api/homework/create", fd);
       setMsg("Assignment published with title. Students can view/download the file.");
       setForm({ ...form, title: "", instructions: "" });
@@ -159,6 +161,8 @@ export default function HomeworkPage() {
       setTasks(hw.tasks || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not publish");
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -358,8 +362,8 @@ export default function HomeworkPage() {
           <input className="field" value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} />
         </div>
         <div className="flex items-end">
-          <button className="btn-accent w-full" onClick={create} disabled={!selected || !form.title}>
-            Publish assignment
+          <button className="btn-accent w-full" onClick={create} disabled={!selected || !form.title || publishing}>
+            {publishing ? "Publishing..." : "Publish assignment"}
           </button>
         </div>
       </div>
