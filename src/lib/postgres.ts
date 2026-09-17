@@ -112,6 +112,7 @@ export async function getPool(): Promise<Pool | null> {
   globalPg.ampPgTriedAt = now;
   const pool = new Pool({
     connectionString: url,
+    ssl: /\.render\.com(?:[/:]|$)/i.test(url) ? { rejectUnauthorized: false } : undefined,
     max: 8,
     connectionTimeoutMillis: 4000
   });
