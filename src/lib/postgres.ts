@@ -13,6 +13,7 @@ const globalPg = globalThis as unknown as {
   ampPgUrl?: string;
   ampPgPending?: { sql: string; params: unknown[] }[];
   ampPgFlushing?: boolean;
+  ampPgFlushPromise?: Promise<void>;
 };
 
 function loadDotEnv() {
@@ -551,26 +552,33 @@ function pending() {
 }
 
 export async function flushPgWrites() {
-  if (globalPg.ampPgFlushing) return;
+  if (globalPg.ampPgFlushPromise) return globalPg.ampPgFlushPromise;
   const q = pending();
   if (!q.length) return;
-  const pool = await getPool();
-  if (!pool) return;
-  globalPg.ampPgFlushing = true;
-  try {
-    while (q.length) {
-      const item = q[0];
-      try {
-        await pool.query(toPg(item.sql), item.params);
-        q.shift();
-      } catch (err) {
-        console.error("[amp] PostgreSQL write failed:", (err as Error).message, item.sql.slice(0, 120));
-        globalPg.ampPgLastError = (err as Error).message;
-        q.shift();
+  globalPg.ampPgFlushPromise = (async () => {
+    const pool = await getPool();
+    if (!pool) return;
+    globalPg.ampPgFlushing = true;
+    try {
+      while (q.length) {
+        const item = q[0];
+        try {
+          await pool.query(toPg(item.sql), item.params);
+          q.shift();
+        } catch (err) {
+          console.error("[amp] PostgreSQL write failed:", (err as Error).message, item.sql.slice(0, 120));
+          globalPg.ampPgLastError = (err as Error).message;
+          q.shift();
+        }
       }
+    } finally {
+      globalPg.ampPgFlushing = false;
     }
+  })();
+  try {
+    await globalPg.ampPgFlushPromise;
   } finally {
-    globalPg.ampPgFlushing = false;
+    globalPg.ampPgFlushPromise = undefined;
   }
 }
 
