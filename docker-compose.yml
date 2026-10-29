@@ -13,5 +13,20 @@ services:
       - amp_pgdata:/var/lib/postgresql/data
       - ./database/postgresql_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 
+  ml:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   amp_pgdata:

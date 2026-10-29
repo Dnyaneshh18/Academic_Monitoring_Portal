@@ -101,3 +101,28 @@ On your PC (Postgres running):
 4. Optional one-shot push: `npm run sync:pg`
 
 Check connection: open `/api/health` — `postgres.connected` should be `true`.
+
+---
+
+## ML Microservice
+
+The risk-scoring engine is a Python microservice powered by scikit-learn.
+
+### Running locally (without Docker)
+```bash
+cd ml
+pip install -r requirements.txt
+python main.py
+# Service available at http://localhost:8000
+```
+
+### Running with Docker Compose
+```bash
+docker-compose up --build
+```
+The ML service starts automatically. The Next.js app connects to it via `ML_SERVICE_URL`.
+
+### Environment Variable
+| Variable | Default | Description |
+|---|---|---|
+| `ML_SERVICE_URL` | `http://localhost:8000` | Base URL of the Python ML service |
