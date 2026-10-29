@@ -21,6 +21,8 @@ type Task = {
   branch_code?: string;
   faculty_name?: string;
   brief_name?: string | null;
+  model_answer?: string | null;
+  keywords?: string | null;
   submission_id?: string;
   file_name?: string;
   submitted_at?: string;
@@ -54,6 +56,8 @@ export default function HomeworkPage() {
   const [form, setForm] = useState({
     title: "",
     instructions: "",
+    modelAnswer: "",
+    keywords: "",
     maxMarks: 20,
     dueDate: ""
   });
@@ -64,6 +68,12 @@ export default function HomeworkPage() {
   const [file, setFile] = useState<Record<string, File | null>>({});
   const [brief, setBrief] = useState<File | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
+  const [aiApplied, setAiApplied] = useState(false);
+  const [aiDismissed, setAiDismissed] = useState(false);
+  const [adjustMode, setAdjustMode] = useState(false);
+  const [adjustHint, setAdjustHint] = useState("");
+  const [prevMarks, setPrevMarks] = useState<Record<string, number | null>>({});
 
   const selected = useMemo(
     () =>
@@ -148,6 +158,8 @@ export default function HomeworkPage() {
     fd.append("subjectId", selected.subject_id);
     fd.append("batch", kind === "LAB" ? batch || "" : "");
     fd.append("instructions", form.instructions);
+    fd.append("modelAnswer", form.modelAnswer);
+    fd.append("keywords", form.keywords);
     fd.append("maxMarks", String(form.maxMarks));
     fd.append("dueDate", form.dueDate);
     if (brief) fd.append("brief", brief);
@@ -203,6 +215,84 @@ export default function HomeworkPage() {
     });
     setMsg(r.note || "Verified submitted work with full marks.");
     await openTask(detail.task.id);
+  }
+
+  function isAiSuggested(s: Row) {
+    return (s.submission?.remark || "").trim().startsWith("Auto-evaluated");
+  }
+
+  async function handleAutoEvaluate() {
+    if (!detail) return;
+    setError("");
+    setMsg("");
+    // Capture current marks so the faculty can revert AI suggestions.
+    const prev: Record<string, number | null> = {};
+    detail.students.forEach((s) => {
+      if (s.submission) prev[s.id] = s.submission.obtained ?? null;
+    });
+    setPrevMarks(prev);
+    setAiApplied(false);
+    setAiDismissed(false);
+    setAdjustMode(false);
+    setAdjustHint("");
+    setEvaluating(true);
+    try {
+      const r = await api<{ ok?: boolean; evaluated_count?: number; error?: string }>(
+        "/api/homework/auto-grade",
+        { method: "POST", body: JSON.stringify({ taskId: detail.task.id }) }
+      );
+      if (!r?.ok) {
+        setError(r?.error || "Auto-evaluation failed");
+        return;
+      }
+      setMsg(`Evaluating submissions using Local NLP… done — ${r.evaluated_count} submission(s) marked. Review the AI suggestions below.`);
+      setAiApplied(true);
+      await openTask(detail.task.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Auto-evaluation failed");
+    } finally {
+      setEvaluating(false);
+    }
+  }
+
+  function acceptAiMarks() {
+    setAiDismissed(true);
+    setAdjustMode(false);
+    setAdjustHint("");
+    setMsg("AI marks accepted — they are saved. Edit any mark anytime to increase or decrease it.");
+  }
+
+  function adjustManually() {
+    setAiDismissed(true);
+    setAdjustMode(true);
+    setAdjustHint(
+      "Edit any mark to increase or decrease it — it saves automatically when you leave the field. Use ↺ to restore a pre-AI mark."
+    );
+  }
+
+  async function revertAiMarks() {
+    if (!detail) return;
+    for (const s of detail.students) {
+      const prev = prevMarks[s.id];
+      if (s.submission && prev !== null && prev !== undefined) {
+        await mark(s.id, prev);
+      }
+    }
+    setAiDismissed(true);
+    setAdjustMode(false);
+    setAdjustHint("");
+    setMsg("Reverted to the marks from before auto-evaluation.");
+  }
+
+  async function revertRow(studentId: string) {
+    if (!detail) return;
+    const prev = prevMarks[studentId];
+    if (prev === null || prev === undefined) {
+      setMsg("No previous mark to restore for this student.");
+      return;
+    }
+    await mark(studentId, prev);
+    setMsg(`Restored previous mark (${prev} / ${detail.task.max_marks}).`);
   }
 
   function fileUrl(id: string) {
@@ -361,6 +451,25 @@ export default function HomeworkPage() {
           <label className="label">Short instructions (optional)</label>
           <input className="field" value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} />
         </div>
+        <div className="md:col-span-4">
+          <label className="label">Model Answer / Key Points (for Auto-Evaluation)</label>
+          <textarea
+            className="field"
+            rows={3}
+            value={form.modelAnswer}
+            onChange={(e) => setForm({ ...form, modelAnswer: e.target.value })}
+            placeholder="Reference answer or key points a good submission should cover — used by the local NLP auto-evaluator…"
+          />
+        </div>
+        <div className="md:col-span-3">
+          <label className="label">Key Concepts (comma-separated, optional)</label>
+          <input
+            className="field"
+            value={form.keywords}
+            onChange={(e) => setForm({ ...form, keywords: e.target.value })}
+            placeholder="e.g. bubble sort, complexity, stability"
+          />
+        </div>
         <div className="flex items-end">
           <button className="btn-accent w-full" onClick={create} disabled={!selected || !form.title || publishing}>
             {publishing ? "Publishing..." : "Publish assignment"}
@@ -410,14 +519,42 @@ export default function HomeworkPage() {
         <section className="glass p-4">
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <h2 className="font-display text-2xl">{detail.task.title}</h2>
-            <button className="btn-accent ml-auto" onClick={verifyAll}>
-              Verify all submitted (full marks)
-            </button>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <button className="btn-accent" onClick={verifyAll}>
+                Verify all submitted (full marks)
+              </button>
+              <button
+                className="btn-accent flex items-center gap-2"
+                onClick={handleAutoEvaluate}
+                disabled={evaluating}
+              >
+                {evaluating ? "Evaluating Submissions…" : "🤖 Auto-Evaluate with AI (Local NLP)"}
+              </button>
+            </div>
           </div>
           <p className="mb-3 text-sm text-ink-600">
             {detail.students.filter((s) => s.submission).length} submitted ·{" "}
             {detail.students.filter((s) => !s.submission).length} not submitted · max {detail.task.max_marks}
           </p>
+          {aiApplied && !aiDismissed ? (
+            <div className="mb-3 rounded-xl border border-brand-300 bg-brand-50 p-3 text-sm">
+              <p className="font-semibold text-brand-900">
+                Local NLP suggested marks for every submission — choose how to proceed:
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button className="btn-accent" onClick={acceptAiMarks}>
+                  ✅ Accept AI marks
+                </button>
+                <button className="btn-ghost" onClick={adjustManually}>
+                  ✏️ Adjust manually
+                </button>
+                <button className="btn-ghost text-danger" onClick={revertAiMarks}>
+                  ↺ Revert AI marks
+                </button>
+              </div>
+              {adjustHint ? <p className="mt-2 text-xs text-ink-600">{adjustHint}</p> : null}
+            </div>
+          ) : null}
           <div className="table-wrap">
             <table className="data">
               <thead>
@@ -427,6 +564,7 @@ export default function HomeworkPage() {
                   <th>Status</th>
                   <th>File</th>
                   <th>Marks</th>
+                  <th>Remark</th>
                 </tr>
               </thead>
               <tbody>
@@ -445,7 +583,8 @@ export default function HomeworkPage() {
                       {s.submission ? (
                         <span className="flex items-center gap-2">
                           <input
-                            className="field max-w-[80px]"
+                            key={`${s.id}-${s.submission.obtained ?? ""}`}
+                            className={`field max-w-[80px] ${isAiSuggested(s) ? "border-brand-400 bg-brand-50" : ""}`}
                             type="number"
                             defaultValue={s.submission.obtained ?? ""}
                             onBlur={(e) => {
@@ -454,11 +593,20 @@ export default function HomeworkPage() {
                             }}
                           />
                           / {detail.task.max_marks}
+                          {isAiSuggested(s) ? (
+                            <span className="badge bg-brand-100 text-brand-800">AI</span>
+                          ) : null}
+                          {isAiSuggested(s) ? (
+                            <button className="btn-ghost text-xs" onClick={() => revertRow(s.id)} title="Restore pre-AI mark">
+                              ↺
+                            </button>
+                          ) : null}
                         </span>
                       ) : (
                         "—"
                       )}
                     </td>
+                    <td className="max-w-[280px] text-xs text-ink-600">{s.submission?.remark || "—"}</td>
                   </tr>
                 ))}
               </tbody>

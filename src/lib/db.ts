@@ -44,6 +44,16 @@ export function getDb(): DatabaseSync {
       /* exists */
     }
     try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_tasks ADD COLUMN model_answer TEXT");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_tasks ADD COLUMN keywords TEXT");
+    } catch {
+      /* exists */
+    }
+    try {
       globalForDb.ampDb.exec(`
         CREATE TABLE IF NOT EXISTS ml_scores (
           student_id TEXT PRIMARY KEY,
@@ -119,6 +129,8 @@ async function syncPostgres(db: DatabaseSync) {
       await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS brief_name TEXT");
       await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS brief_path TEXT");
       await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS brief_data BYTEA");
+      await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS model_answer TEXT");
+      await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS keywords TEXT");
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS file_data BYTEA");
     } catch {
       /* older pg */
@@ -380,6 +392,8 @@ function migrate(db: DatabaseSync) {
       brief_name TEXT,
       brief_path TEXT,
       brief_data BLOB,
+      model_answer TEXT,
+      keywords TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS homework_submissions (

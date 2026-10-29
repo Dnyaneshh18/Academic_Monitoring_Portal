@@ -343,6 +343,8 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
   brief_name TEXT,
   brief_path TEXT,
   brief_data BYTEA,
+  model_answer TEXT,
+  keywords TEXT,
   created_at TEXT DEFAULT (NOW()::text)
 );
 CREATE TABLE IF NOT EXISTS homework_submissions (

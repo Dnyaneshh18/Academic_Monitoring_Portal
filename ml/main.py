@@ -12,13 +12,29 @@ Run locally:
     python main.py          # http://localhost:8000
 """
 
+import base64
+import io
+import os
+import re
 from decimal import Decimal, ROUND_HALF_UP
 
 import numpy as np
 from flask import Flask, jsonify, request
 from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import train_test_split
+
+try:  # pypdf is optional at import time — PDF text extraction degrades gracefully
+    from pypdf import PdfReader
+except Exception:  # noqa: BLE001
+    PdfReader = None
+
+try:  # sentence-transformers is optional — the service falls back to TF-IDF
+    from sentence_transformers import SentenceTransformer
+except Exception:  # noqa: BLE001
+    SentenceTransformer = None
 
 app = Flask(__name__)
 
@@ -157,6 +173,113 @@ def _empty_model():
 
 def _empty_clusters():
     return [{"name": n, "count": 0, "avgAttendance": 0.0, "avgMarks": 0.0} for n in CLUSTER_NAMES]
+
+
+# ---------------------------------------------------------------------------
+# Assignment auto-evaluation (dual-engine NLP, 100% local)
+# ---------------------------------------------------------------------------
+
+# Lazy SentenceTransformer singleton — loaded once on first use. If the
+# library or the model is unavailable, evaluation falls back to TF-IDF.
+_st_model = None
+_st_tried = False
+
+STOPWORDS = frozenset(
+    """a an the and or but if then else of to in on at for with by from as is are was were be
+    been being this that these those it its i you he she they we his her their our your my
+    not no do does did done have has had will would can could should may might must about into
+    over under between within without among each other more most much many very just also
+    such only own same so than too well even still however because while which who whom whose
+    there here what when where why""".split()
+)
+
+
+def _get_st_model():
+    global _st_model, _st_tried
+    if _st_tried:
+        return _st_model
+    _st_tried = True
+    if SentenceTransformer is None:
+        return None
+    try:
+        _st_model = SentenceTransformer("all-MiniLM-L6-v2")
+        print("[evaluate-assignment] SentenceTransformer model loaded.")
+    except Exception as e:  # noqa: BLE001
+        _st_model = None
+        print("[evaluate-assignment] SentenceTransformer unavailable — using TF-IDF fallback:", e)
+    return _st_model
+
+
+def extract_text_from_pdf(data) -> str:
+    """Extract text from PDF bytes or a file path using pypdf."""
+    if PdfReader is None:
+        raise RuntimeError("pypdf is not installed")
+    if isinstance(data, (str, os.PathLike)):
+        with open(data, "rb") as fh:
+            reader = PdfReader(fh)
+    else:
+        reader = PdfReader(io.BytesIO(data))
+    parts = []
+    for page in reader.pages:
+        try:
+            parts.append(page.extract_text() or "")
+        except Exception:  # noqa: BLE001 — skip unreadable pages
+            parts.append("")
+    return "\n".join(parts).strip()
+
+
+def _extract_keywords(text: str, limit: int = 8):
+    """Frequency-ranked keyword extraction from the model answer text."""
+    words = re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", text.lower())
+    freq: dict = {}
+    order: dict = {}
+    for i, w in enumerate(words):
+        if w in STOPWORDS or w.isdigit():
+            continue
+        freq[w] = freq.get(w, 0) + 1
+        order.setdefault(w, i)
+    ranked = sorted(freq, key=lambda w: (-freq[w], order[w]))
+    return ranked[:limit]
+
+
+def _keyword_coverage(text: str, keywords):
+    """Keywords found in the student text (word-boundary, case-insensitive)."""
+    text_l = text.lower()
+    matched = []
+    for kw in keywords:
+        kw_l = str(kw).lower().strip()
+        if not kw_l:
+            continue
+        if re.search(r"\b" + re.escape(kw_l) + r"\b", text_l):
+            matched.append(kw)
+    return matched
+
+
+def _semantic_scores(reference: str, submission_texts):
+    """Cosine similarity between each submission and the reference answer.
+
+    Engine 1: SentenceTransformer('all-MiniLM-L6-v2') embeddings.
+    Engine 2 (fallback): TF-IDF vectorizer + cosine similarity.
+    """
+    model = _get_st_model()
+    if model is not None:
+        try:
+            emb = model.encode([reference] + submission_texts, normalize_embeddings=True, convert_to_numpy=True)
+            sims = []
+            for i in range(len(submission_texts)):
+                sim = float(np.dot(emb[0], emb[i + 1]))
+                sims.append(max(0.0, min(1.0, sim)))
+            return sims
+        except Exception as e:  # noqa: BLE001 — half-initialized model → fall back
+            print("[evaluate-assignment] SentenceTransformer encoding failed — using TF-IDF fallback:", e)
+    corpus = [reference] + submission_texts
+    corpus = [reference] + submission_texts
+    try:
+        tf = TfidfVectorizer(lowercase=True, stop_words="english").fit_transform(corpus)
+    except ValueError:  # empty vocabulary
+        return [0.0] * len(submission_texts)
+    sims = cosine_similarity(tf[0:1], tf[1:]).flatten()
+    return [max(0.0, min(1.0, float(s))) for s in sims]
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +454,125 @@ def predict():
         }
 
         return jsonify({"model": model_out, "students": students, "clusters": clusters})
+    except Exception as e:  # noqa: BLE001 — report any failure as HTTP 500
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/evaluate-assignment", methods=["POST"])
+def evaluate_assignment():
+    """Score student submissions against a model answer / keyword list.
+
+    Body:
+      {
+        "max_marks": 10,
+        "model_answer": "...",                    # optional
+        "keywords": ["...", ...],                 # optional (else extracted)
+        "submissions": [{"submission_id": "hs_1",
+                          "text": "...",          # pre-extracted text
+                          "pdf_base64": "..."}]   # or raw PDF (extracted via pypdf)
+      }
+    Returns: {"results": [{submission_id, obtained, percentage, remark}]}
+    """
+    try:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Request body must be a JSON object"}), 400
+
+        max_marks = float(data.get("max_marks") or 0)
+        if max_marks <= 0:
+            return jsonify({"error": "max_marks must be greater than 0"}), 400
+
+        model_answer = str(data.get("model_answer") or "").strip()
+        keywords_raw = data.get("keywords") or []
+        if not isinstance(keywords_raw, list):
+            keywords_raw = []
+        keywords = [str(k).strip() for k in keywords_raw if str(k).strip()]
+
+        submissions = data.get("submissions") or []
+        if not isinstance(submissions, list):
+            return jsonify({"error": "'submissions' must be a list"}), 400
+
+        if not model_answer and not keywords:
+            return jsonify({"error": "Provide a model answer or keyword list to evaluate against"}), 400
+
+        reference = model_answer or " ".join(keywords)
+        keywords = keywords or _extract_keywords(reference)
+
+        # Resolve each submission to text (extract PDF text when needed).
+        items = []
+        for s in submissions:
+            if not isinstance(s, dict):
+                continue
+            sid = str(s.get("submission_id") or "")
+            text = str(s.get("text") or "").strip()
+            if not text and s.get("pdf_base64"):
+                try:
+                    text = extract_text_from_pdf(base64.b64decode(s["pdf_base64"]))
+                except Exception:  # noqa: BLE001 — unreadable PDF → empty text
+                    text = ""
+            items.append((sid, text))
+
+        if not items:
+            return jsonify({"results": []})
+
+        # Semantic similarity for all submissions with readable text.
+        semantic_by_pos = {}
+        readable = [t for _, t in items if t]
+        if readable:
+            sims = _semantic_scores(reference, readable)
+            pos = 0
+            for i in range(len(items)):
+                if items[i][1]:
+                    semantic_by_pos[i] = sims[pos]
+                    pos += 1
+
+        results = []
+        for i, (sid, text) in enumerate(items):
+            if not text:
+                results.append({
+                    "submission_id": sid,
+                    "obtained": 0.0,
+                    "percentage": 0.0,
+                    "remark": "Auto-evaluated: no readable text found in submission — check the file format."
+                })
+                continue
+
+            sem = semantic_by_pos[i]
+            matched = _keyword_coverage(text, keywords)
+            kw_score = len(matched) / len(keywords) if keywords else None
+            completeness = min(len(text) / max(len(reference), 1), 1.0)
+
+            if kw_score is None:
+                # No keywords: redistribute the weights over the remaining parts.
+                combined = (sem * 0.6 + completeness * 0.1) / 0.7
+                kw_note = ""
+            else:
+                combined = sem * 0.6 + kw_score * 0.3 + completeness * 0.1
+                kw_note = (
+                    f" (Keywords: {len(matched)}/{len(keywords)} found: [{', '.join(matched)}])"
+                    if keywords
+                    else ""
+                )
+
+            combined = max(0.0, min(1.0, combined))
+            obtained = _r1(combined * max_marks)
+            percentage = _r1(obtained / max_marks * 100.0)
+
+            if percentage >= 85:
+                note = "Strong match."
+            elif percentage >= 60:
+                note = "Partial match — review weak areas."
+            else:
+                note = "Weak match — review required."
+
+            results.append({
+                "submission_id": sid,
+                "obtained": obtained,
+                "percentage": percentage,
+                "remark": f"Auto-evaluated: {percentage}% match. {note}{kw_note}"
+            })
+
+        return jsonify({"results": results})
     except Exception as e:  # noqa: BLE001 — report any failure as HTTP 500
         return jsonify({"error": str(e)}), 500
 

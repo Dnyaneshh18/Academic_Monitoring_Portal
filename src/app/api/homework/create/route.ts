@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
   const subjectId = String(form.get("subjectId") || "");
   const batch = String(form.get("batch") || "") || null;
   const instructions = String(form.get("instructions") || "") || null;
+  const modelAnswer = String(form.get("modelAnswer") || "").trim() || null;
+  const keywords = String(form.get("keywords") || "").trim() || null;
   const dueDate = String(form.get("dueDate") || "") || null;
   const maxMarks = Number(form.get("maxMarks"));
   const file = form.get("brief");
@@ -56,9 +58,9 @@ export async function POST(req: NextRequest) {
   }
 
   run(
-    `INSERT INTO homework_tasks (id, faculty_id, subject_id, class_id, batch, title, instructions, max_marks, due_date, brief_name, brief_path, brief_data)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, user.facultyId, subjectId, sub.class_id, batch, title, instructions, maxMarks, dueDate, briefName, briefPath, briefData]
+    `INSERT INTO homework_tasks (id, faculty_id, subject_id, class_id, batch, title, instructions, max_marks, due_date, brief_name, brief_path, brief_data, model_answer, keywords)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, user.facultyId, subjectId, sub.class_id, batch, title, instructions, maxMarks, dueDate, briefName, briefPath, briefData, modelAnswer, keywords]
   );
   try {
     await flushPgWrites();
