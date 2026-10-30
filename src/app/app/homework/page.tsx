@@ -232,6 +232,33 @@ export default function HomeworkPage() {
     }
   }
 
+  async function reevaluate(taskId: string) {
+    setError("");
+    setMsg("");
+    setEvaluating(true);
+    try {
+      const r = await api<{
+        ok?: boolean;
+        ai?: { obtained: number; remark: string };
+        error?: string;
+      }>("/api/homework/evaluate", {
+        method: "POST",
+        body: JSON.stringify({ taskId })
+      });
+      if (!r?.ok) {
+        setError(r?.error || "AI evaluation failed");
+        return;
+      }
+      setMsg(`🤖 AI estimate: ${r.ai?.obtained} marks — ${r.ai?.remark}`);
+      const hw = await api<{ tasks: Task[] }>("/api/homework");
+      setTasks(hw.tasks || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI evaluation failed");
+    } finally {
+      setEvaluating(false);
+    }
+  }
+
   async function mark(studentId: string, obtained: number) {
     if (!detail) return;
     await api("/api/homework", {
@@ -396,7 +423,18 @@ export default function HomeworkPage() {
                 <button className="btn-accent" onClick={() => upload(t.id)}>
                   Upload
                 </button>
-                {t.submission_id ? <FileOpen href={fileUrl(t.submission_id)} label="View / download my file" /> : null}
+                {t.submission_id ? (
+                  <>
+                    <button
+                      className="btn-ghost text-xs"
+                      onClick={() => reevaluate(t.id)}
+                      disabled={evaluating}
+                    >
+                      {evaluating ? "Evaluating…" : "🤖 Re-evaluate"}
+                    </button>
+                    <FileOpen href={fileUrl(t.submission_id)} label="View / download my file" />
+                  </>
+                ) : null}
               </div>
             </article>
           ))}
