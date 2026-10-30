@@ -32,6 +32,7 @@ type Task = {
   ai_semantic_score?: number | null;
   ai_keyword_score?: number | null;
   ai_completeness_score?: number | null;
+  ai_plagiarism_score?: number | null;
   ai_matched_keywords?: string | null;
   ai_remark?: string | null;
   ai_evaluated_at?: string | null;
@@ -53,6 +54,7 @@ type Row = {
     ai_semantic_score: number | null;
     ai_keyword_score: number | null;
     ai_completeness_score: number | null;
+    ai_plagiarism_score: number | null;
     ai_matched_keywords: string | null;
     ai_remark: string | null;
     ai_evaluated_at: string | null;
@@ -66,6 +68,7 @@ type AiResult = {
   semantic_score: number;
   keyword_score: number;
   completeness_score: number;
+  plagiarism_score: number;
   matched_keywords: string[];
 };
 
@@ -469,6 +472,9 @@ export default function HomeworkPage() {
                   {t.ai_matched_keywords ? (
                     <p className="mt-0.5 text-ink-600">
                       Keywords matched: {JSON.parse(t.ai_matched_keywords || "[]").join(", ") || "—"}
+                  {t.ai_plagiarism_score !== null && t.ai_plagiarism_score !== undefined ? (
+                    <p className="text-[11px] text-ink-500">Originality: {Math.round(t.ai_plagiarism_score * 100)}%</p>
+                  ) : null}
                     </p>
                   ) : null}
                   {t.ai_evaluated_at ? <p className="text-ink-400">Evaluated at {t.ai_evaluated_at}</p> : null}
