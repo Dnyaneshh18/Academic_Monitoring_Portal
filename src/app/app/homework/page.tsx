@@ -45,6 +45,16 @@ type Row = {
   } | null;
 };
 
+type AiResult = {
+  student_id: string;
+  obtained: number;
+  remark: string;
+  semantic_score: number;
+  keyword_score: number;
+  completeness_score: number;
+  matched_keywords: string[];
+};
+
 export default function HomeworkPage() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -69,10 +79,7 @@ export default function HomeworkPage() {
   const [brief, setBrief] = useState<File | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
-  const [aiApplied, setAiApplied] = useState(false);
-  const [aiDismissed, setAiDismissed] = useState(false);
-  const [adjustMode, setAdjustMode] = useState(false);
-  const [adjustHint, setAdjustHint] = useState("");
+  const [aiResults, setAiResults] = useState<Record<string, AiResult> | null>(null);
   const [prevMarks, setPrevMarks] = useState<Record<string, number | null>>({});
 
   const selected = useMemo(
@@ -225,29 +232,34 @@ export default function HomeworkPage() {
     if (!detail) return;
     setError("");
     setMsg("");
-    // Capture current marks so the faculty can revert AI suggestions.
+    // Capture current marks so the faculty can revert AI suggestions later.
     const prev: Record<string, number | null> = {};
     detail.students.forEach((s) => {
       if (s.submission) prev[s.id] = s.submission.obtained ?? null;
     });
     setPrevMarks(prev);
-    setAiApplied(false);
-    setAiDismissed(false);
-    setAdjustMode(false);
-    setAdjustHint("");
+    setAiResults(null);
     setEvaluating(true);
     try {
-      const r = await api<{ ok?: boolean; evaluated_count?: number; error?: string }>(
-        "/api/homework/auto-grade",
-        { method: "POST", body: JSON.stringify({ taskId: detail.task.id }) }
-      );
+      const r = await api<{
+        ok?: boolean;
+        evaluated_count?: number;
+        results?: AiResult[];
+        error?: string;
+      }>("/api/homework/auto-grade", {
+        method: "POST",
+        body: JSON.stringify({ taskId: detail.task.id, preview: true })
+      });
       if (!r?.ok) {
         setError(r?.error || "Auto-evaluation failed");
         return;
       }
-      setMsg(`Evaluating submissions using Local NLP… done — ${r.evaluated_count} submission(s) marked. Review the AI suggestions below.`);
-      setAiApplied(true);
-      await openTask(detail.task.id);
+      const keyed: Record<string, AiResult> = {};
+      for (const res of r.results || []) {
+        keyed[res.student_id] = res;
+      }
+      setAiResults(keyed);
+      setMsg(`Evaluating submissions using Local NLP… done — ${r.evaluated_count} suggestion(s) ready to review.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Auto-evaluation failed");
     } finally {
@@ -255,37 +267,42 @@ export default function HomeworkPage() {
     }
   }
 
-  function acceptAiMarks() {
-    setAiDismissed(true);
-    setAdjustMode(false);
-    setAdjustHint("");
-    setMsg("AI marks accepted — they are saved. Edit any mark anytime to increase or decrease it.");
-  }
-
-  function adjustManually() {
-    setAiDismissed(true);
-    setAdjustMode(true);
-    setAdjustHint(
-      "Edit any mark to increase or decrease it — it saves automatically when you leave the field. Use ↺ to restore a pre-AI mark."
-    );
-  }
-
-  async function revertAiMarks() {
+  async function acceptAiMarks() {
     if (!detail) return;
-    for (const s of detail.students) {
-      const prev = prevMarks[s.id];
-      if (s.submission && prev !== null && prev !== undefined) {
-        await mark(s.id, prev);
+    setEvaluating(true);
+    try {
+      const r = await api<{ ok?: boolean; evaluated_count?: number; error?: string }>(
+        "/api/homework/auto-grade",
+        { method: "POST", body: JSON.stringify({ taskId: detail.task.id, apply: true }) }
+      );
+      if (!r?.ok) {
+        setError(r?.error || "Could not commit AI marks");
+        return;
       }
+      setAiResults(null);
+      setMsg("AI marks accepted and saved. Edit any mark anytime to increase or decrease it.");
+      await openTask(detail.task.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not commit AI marks");
+    } finally {
+      setEvaluating(false);
     }
-    setAiDismissed(true);
-    setAdjustMode(false);
-    setAdjustHint("");
-    setMsg("Reverted to the marks from before auto-evaluation.");
+  }
+
+  function revertAiMarks() {
+    setAiResults(null);
+    setMsg("AI suggestions discarded — your original marks are still in place.");
   }
 
   async function revertRow(studentId: string) {
     if (!detail) return;
+    if (aiResults && aiResults[studentId]) {
+      const next = { ...aiResults };
+      delete next[studentId];
+      setAiResults(next);
+      setMsg("AI suggestion for this student dismissed.");
+      return;
+    }
     const prev = prevMarks[studentId];
     if (prev === null || prev === undefined) {
       setMsg("No previous mark to restore for this student.");
@@ -536,23 +553,23 @@ export default function HomeworkPage() {
             {detail.students.filter((s) => s.submission).length} submitted ·{" "}
             {detail.students.filter((s) => !s.submission).length} not submitted · max {detail.task.max_marks}
           </p>
-          {aiApplied && !aiDismissed ? (
+          {aiResults ? (
             <div className="mb-3 rounded-xl border border-brand-300 bg-brand-50 p-3 text-sm">
               <p className="font-semibold text-brand-900">
-                Local NLP suggested marks for every submission — choose how to proceed:
+                Local NLP suggested marks — review before committing:
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button className="btn-accent" onClick={acceptAiMarks}>
+                <button className="btn-accent" onClick={acceptAiMarks} disabled={evaluating}>
                   ✅ Accept AI marks
                 </button>
-                <button className="btn-ghost" onClick={adjustManually}>
-                  ✏️ Adjust manually
-                </button>
-                <button className="btn-ghost text-danger" onClick={revertAiMarks}>
+                <button className="btn-ghost" onClick={revertAiMarks}>
                   ↺ Revert AI marks
                 </button>
               </div>
-              {adjustHint ? <p className="mt-2 text-xs text-ink-600">{adjustHint}</p> : null}
+              <p className="mt-2 text-xs text-ink-600">
+                Nothing is saved yet. Accept commits the suggested marks to the database; revert keeps your
+                original marks. You can also edit any mark inline — it saves automatically.
+              </p>
             </div>
           ) : null}
           <div className="table-wrap">
@@ -593,11 +610,17 @@ export default function HomeworkPage() {
                             }}
                           />
                           / {detail.task.max_marks}
-                          {isAiSuggested(s) ? (
+                          {aiResults?.[s.id] ? (
+                            <span className="badge bg-brand-100 text-brand-800">AI Graded</span>
+                          ) : isAiSuggested(s) ? (
                             <span className="badge bg-brand-100 text-brand-800">AI</span>
                           ) : null}
-                          {isAiSuggested(s) ? (
-                            <button className="btn-ghost text-xs" onClick={() => revertRow(s.id)} title="Restore pre-AI mark">
+                          {(aiResults?.[s.id] || isAiSuggested(s)) ? (
+                            <button
+                              className="btn-ghost text-xs"
+                              onClick={() => revertRow(s.id)}
+                              title={aiResults?.[s.id] ? "Dismiss AI suggestion" : "Restore pre-AI mark"}
+                            >
                               ↺
                             </button>
                           ) : null}
@@ -605,8 +628,18 @@ export default function HomeworkPage() {
                       ) : (
                         "—"
                       )}
+                      {aiResults?.[s.id] ? (
+                        <div
+                          className="mt-1 max-w-[220px] truncate text-[11px] text-brand-700"
+                          title={aiResults[s.id].remark}
+                        >
+                          AI suggests {aiResults[s.id].obtained}
+                        </div>
+                      ) : null}
                     </td>
-                    <td className="max-w-[280px] text-xs text-ink-600">{s.submission?.remark || "—"}</td>
+                    <td className="max-w-[280px] text-xs text-ink-600">
+                      {aiResults?.[s.id]?.remark || s.submission?.remark || "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

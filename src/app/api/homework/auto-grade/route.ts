@@ -77,6 +77,10 @@ export async function POST(req: NextRequest) {
   const taskId = String(body.taskId || "");
   if (!taskId) return json({ error: "taskId is required" }, 400);
 
+  // preview: return graded suggestions without writing to the DB
+  const preview = body.preview === true;
+  const apply = body.apply === true || !preview;
+
   const task = one<{ faculty_id: string; model_answer: string | null; instructions: string | null; keywords: string | null; max_marks: number }>(
     "SELECT faculty_id, model_answer, instructions, keywords, max_marks FROM homework_tasks WHERE id = ?",
     [taskId]
@@ -95,7 +99,12 @@ export async function POST(req: NextRequest) {
   const items = [];
   for (const sub of subs) {
     const extracted = await extractSubmissionText(sub);
-    items.push({ submission_id: sub.id, text: extracted.text, ...(extracted.pdf_base64 ? { pdf_base64: extracted.pdf_base64 } : {}) });
+    items.push({
+      student_id: sub.student_id,
+      submission_id: sub.id,
+      text: extracted.text,
+      ...(extracted.pdf_base64 ? { pdf_base64: extracted.pdf_base64 } : {})
+    });
   }
 
   let resp: Response;
@@ -120,18 +129,27 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = (await resp.json().catch(() => ({}))) as {
-    results?: { submission_id: string; obtained: number; percentage: number; remark: string }[];
+    results?: { student_id: string; submission_id?: string; obtained: number; semantic_score: number; keyword_score: number; completeness_score: number; matched_keywords: string[]; remark: string }[];
     error?: string;
   };
   const results = payload.results || [];
 
-  for (const r of results) {
-    run("UPDATE homework_submissions SET obtained = ?, remark = ?, verified = 1 WHERE id = ?", [
-      r.obtained,
-      r.remark,
-      r.submission_id
-    ]);
+  if (apply) {
+    for (const r of results) {
+      const target =
+        r.submission_id ||
+        one<{ id: string }>("SELECT id FROM homework_submissions WHERE task_id = ? AND student_id = ?", [
+          taskId,
+          r.student_id
+        ])?.id;
+      if (!target) continue;
+      run("UPDATE homework_submissions SET obtained = ?, remark = ?, verified = 1 WHERE id = ?", [
+        r.obtained,
+        r.remark,
+        target
+      ]);
+    }
   }
 
-  return json({ ok: true, evaluated_count: results.length, results });
+  return json({ ok: true, preview, evaluated_count: results.length, results });
 }
