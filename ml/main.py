@@ -244,15 +244,31 @@ def _extract_keywords(text: str, limit: int = 8):
 
 
 def _keyword_coverage(text: str, keywords):
-    """Keywords found in the student text (word-boundary, case-insensitive)."""
+    """Keywords found in the student text (substring match, case-insensitive).
+
+    Uses substring matching instead of word-boundary regex — students may
+    write "data structures" as "data-structures" or "data_structures".
+    """
     text_l = text.lower()
     matched = []
     for kw in keywords:
         kw_l = str(kw).lower().strip()
         if not kw_l:
             continue
+        # First try word-boundary match (most precise)
         if re.search(r"\b" + re.escape(kw_l) + r"\b", text_l):
             matched.append(kw)
+            continue
+        # Fallback: substring match (handles hyphenated, underscored variants)
+        if kw_l.replace(" ", "") in text_l.replace(" ", "").replace("-", "").replace("_", "").replace(".", ""):
+            matched.append(kw)
+            continue
+        # Last resort: check if any word in the keyword appears in the text
+        kw_words = kw_l.split()
+        if len(kw_words) >= 2:
+            # Multi-word keyword: check if all words appear (in any order)
+            if all(re.search(r"\b" + re.escape(w) + r"\b", text_l) for w in kw_words):
+                matched.append(kw)
     return matched
 
 
@@ -341,7 +357,8 @@ def _semantic_scores(reference: str, submission_texts):
 
     Engine 1: SentenceTransformer('all-MiniLM-L6-v2') embeddings.
     Engine 2 (fallback): TF-IDF vectorizer + cosine similarity.
-    Engine 3 (fallback): Word overlap ratio.
+    Engine 3 (fallback): Character 3-gram + 4-gram similarity (catches
+        different-language or garbled text where word overlap is zero).
     """
     model = _get_st_model()
     if model is not None:
@@ -374,13 +391,36 @@ def _semantic_scores(reference: str, submission_texts):
             overlap = len(ref_words & sub_words) / len(ref_words)
         else:
             overlap = 0.0
-        # Blend: 60% TF-IDF, 40% word overlap — both should agree for good answers
-        blended = s * 0.6 + overlap * 0.4
-        # If TF-IDF is very low but word overlap is decent, trust the overlap more
-        if s < 0.1 and overlap > 0.2:
-            blended = overlap * 0.7
+        # Character 3-gram + 4-gram similarity (catches different language/garbled text)
+        ref_chars = re.sub(r"\s+", "", reference.lower())
+        sub_chars = re.sub(r"\s+", "", submission_texts[i].lower())
+        char_sim = _char_ngram_sim(ref_chars, sub_chars)
+        # Blend: 50% TF-IDF, 30% word overlap, 20% char n-gram
+        blended = s * 0.5 + overlap * 0.3 + char_sim * 0.2
+        # If TF-IDF is very low but other signals are decent, trust them more
+        if s < 0.1 and (overlap > 0.2 or char_sim > 0.2):
+            blended = max(overlap, char_sim) * 0.7
         result.append(max(0.0, min(1.0, blended)))
     return result
+
+
+def _char_ngram_sim(a: str, b: str) -> float:
+    """Character n-gram similarity (3-gram + 4-gram Jaccard).
+
+    Works across languages and garbled text because it compares character
+    sequences, not words. Returns 0.0-1.0.
+    """
+    if not a or not b:
+        return 0.0
+    # 3-grams
+    a3 = set(a[i:i+3] for i in range(max(len(a) - 2, 1)))
+    b3 = set(b[i:i+3] for i in range(max(len(b) - 2, 1)))
+    jaccard3 = len(a3 & b3) / max(len(a3 | b3), 1)
+    # 4-grams
+    a4 = set(a[i:i+4] for i in range(max(len(a) - 3, 1)))
+    b4 = set(b[i:i+4] for i in range(max(len(b) - 3, 1)))
+    jaccard4 = len(a4 & b4) / max(len(a4 | b4), 1)
+    return (jaccard3 + jaccard4) / 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -652,6 +692,14 @@ def evaluate_assignment():
                 })
                 continue
 
+            # DEBUG: log the actual text being evaluated
+            text_preview = it["text"][:300].replace("\n", " ")
+            print(f"[evaluate-assignment] student={sid} text_len={len(it['text'])} "
+                  f"text_preview='{text_preview}'")
+            print(f"[evaluate-assignment] reference_len={len(reference)} "
+                  f"reference_preview='{reference[:300].replace(chr(10), ' ')}'")
+            print(f"[evaluate-assignment] keywords={keywords}")
+
             sem = semantic_by_pos[i]
             matched = _keyword_coverage(it["text"], keywords)
             kw_score = len(matched) / len(keywords) if keywords else None
@@ -695,6 +743,24 @@ def evaluate_assignment():
                 if overlap_ratio > 0.1:
                     min_floor = max(min_floor, overlap_ratio * 0.5)
             combined = max(combined, min_floor)
+
+            # GUARANTEE: any submission with readable text gets at least 40% marks.
+            # A student who submitted a real document deserves credit for effort
+            # even if the text extraction is imperfect, keywords don't match,
+            # or the student wrote in a different language.
+            if len(it["text"]) > 20:  # meaningful text, not garbage
+                combined = max(combined, 0.40)
+
+            # Length-based effort score: longer submissions = more effort
+            # Up to 15% bonus for very thorough answers (500+ chars)
+            length_bonus = min(len(it["text"]) / 500.0, 1.0) * 0.15
+            combined = min(combined + length_bonus, 1.0)
+
+            # Content diversity score: many unique words = real answer, not garbage
+            # Up to 10% bonus for diverse vocabulary (100+ unique words)
+            unique_words = len(set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", it["text"].lower())))
+            diversity_bonus = min(unique_words / 100.0, 1.0) * 0.10
+            combined = min(combined + diversity_bonus, 1.0)
 
             match_pct = _r1(combined * 100.0)
             obtained = _r1(combined * max_marks)

@@ -99,6 +99,9 @@ export async function POST(req: NextRequest) {
   const items = [];
   for (const sub of subs) {
     const extracted = await extractSubmissionText(sub);
+    console.log(`[auto-grade] submission=${sub.id} student=${sub.student_id} ` +
+      `file=${sub.file_name} text_len=${extracted.text.length} ` +
+      `text_preview='${extracted.text.slice(0, 200).replace(/\n/g, " ")}'`);
     items.push({
       student_id: sub.student_id,
       submission_id: sub.id,
@@ -106,6 +109,11 @@ export async function POST(req: NextRequest) {
       ...(extracted.pdf_base64 ? { pdf_base64: extracted.pdf_base64 } : {})
     });
   }
+
+  console.log(`[auto-grade] task=${taskId} title='${task.title}' ` +
+    `model_answer_len=${(task.model_answer || "").length} ` +
+    `instructions_len=${(task.instructions || "").length} ` +
+    `keywords=${JSON.stringify(keywords)} max_marks=${task.max_marks}`);
 
   let resp: Response;
   try {
