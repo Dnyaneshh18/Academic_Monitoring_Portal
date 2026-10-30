@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       "SELECT model_answer, instructions, keywords, max_marks, title FROM homework_tasks WHERE id = ?",
       [taskId]
     );
-    const modelAnswer = (meta?.model_answer || meta?.title || "").trim();
+    const modelAnswer = (meta?.model_answer || meta?.instructions || meta?.title || "").trim();
     let keywords: string[] = [];
     if (meta?.keywords) {
       try {
@@ -151,9 +151,16 @@ export async function POST(req: NextRequest) {
         max_marks: meta?.max_marks ?? 10,
         submissions: [{ student_id: st.id, submission_id: subRow.id, text, size: file.size }]
       };
-      if (!text && ext === ".pdf") {
-        // Let the ML service try extracting from the raw PDF bytes.
-        payload.submissions = [{ student_id: st.id, submission_id: subRow.id, pdf_base64: fileData.toString("base64"), size: file.size }];
+      if (!text) {
+        if (ext === ".pdf") {
+          // Let the ML service try extracting from the raw PDF bytes.
+          payload.submissions = [{ student_id: st.id, submission_id: subRow.id, pdf_base64: fileData.toString("base64"), size: file.size }];
+        } else if (ext === ".docx" || ext === ".doc") {
+          // Send raw bytes for ML-side python-docx extraction
+          payload.submissions = [{ student_id: st.id, submission_id: subRow.id, docx_base64: fileData.toString("base64"), size: file.size }];
+        }
+        // Other types (.pptx, .zip, images): text stays "" but size is passed
+        // so the ML service can give an effort-based score instead of 0.
       }
       try {
         const resp = await fetch(`${ML_SERVICE_URL}/evaluate-assignment`, {
