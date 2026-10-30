@@ -744,12 +744,23 @@ def evaluate_assignment():
                     min_floor = max(min_floor, overlap_ratio * 0.5)
             combined = max(combined, min_floor)
 
-            # GUARANTEE: any submission with readable text gets at least 30% marks.
+            # GUARANTEE: any submission with readable text gets at least 40% marks.
             # A student who submitted a real document deserves credit for effort
             # even if the text extraction is imperfect, keywords don't match,
             # or the student wrote in a different language.
             if len(it["text"]) > 20:  # meaningful text, not garbage
-                combined = max(combined, 0.30)
+                combined = max(combined, 0.40)
+
+            # Length-based effort score: longer submissions = more effort
+            # Up to 15% bonus for very thorough answers (500+ chars)
+            length_bonus = min(len(it["text"]) / 500.0, 1.0) * 0.15
+            combined = min(combined + length_bonus, 1.0)
+
+            # Content diversity score: many unique words = real answer, not garbage
+            # Up to 10% bonus for diverse vocabulary (100+ unique words)
+            unique_words = len(set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", it["text"].lower())))
+            diversity_bonus = min(unique_words / 100.0, 1.0) * 0.10
+            combined = min(combined + diversity_bonus, 1.0)
 
             match_pct = _r1(combined * 100.0)
             obtained = _r1(combined * max_marks)
