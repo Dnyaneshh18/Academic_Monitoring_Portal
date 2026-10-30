@@ -66,7 +66,7 @@ async function getHomework(req: NextRequest) {
               u.name as faculty_name,
               sub.id as submission_id, sub.file_name, sub.submitted_at, sub.verified, sub.obtained,
               sub.ai_obtained, sub.ai_semantic_score, sub.ai_keyword_score, sub.ai_completeness_score,
-              sub.ai_matched_keywords, sub.ai_remark, sub.ai_evaluated_at
+              sub.ai_plagiarism_score, sub.ai_matched_keywords, sub.ai_remark, sub.ai_evaluated_at
        FROM homework_tasks t
        JOIN subjects s ON s.id = t.subject_id
        JOIN classes c ON c.id = t.class_id
