@@ -357,7 +357,8 @@ def _semantic_scores(reference: str, submission_texts):
 
     Engine 1: SentenceTransformer('all-MiniLM-L6-v2') embeddings.
     Engine 2 (fallback): TF-IDF vectorizer + cosine similarity.
-    Engine 3 (fallback): Word overlap ratio.
+    Engine 3 (fallback): Character 3-gram + 4-gram similarity (catches
+        different-language or garbled text where word overlap is zero).
     """
     model = _get_st_model()
     if model is not None:
@@ -390,13 +391,36 @@ def _semantic_scores(reference: str, submission_texts):
             overlap = len(ref_words & sub_words) / len(ref_words)
         else:
             overlap = 0.0
-        # Blend: 60% TF-IDF, 40% word overlap — both should agree for good answers
-        blended = s * 0.6 + overlap * 0.4
-        # If TF-IDF is very low but word overlap is decent, trust the overlap more
-        if s < 0.1 and overlap > 0.2:
-            blended = overlap * 0.7
+        # Character 3-gram + 4-gram similarity (catches different language/garbled text)
+        ref_chars = re.sub(r"\s+", "", reference.lower())
+        sub_chars = re.sub(r"\s+", "", submission_texts[i].lower())
+        char_sim = _char_ngram_sim(ref_chars, sub_chars)
+        # Blend: 50% TF-IDF, 30% word overlap, 20% char n-gram
+        blended = s * 0.5 + overlap * 0.3 + char_sim * 0.2
+        # If TF-IDF is very low but other signals are decent, trust them more
+        if s < 0.1 and (overlap > 0.2 or char_sim > 0.2):
+            blended = max(overlap, char_sim) * 0.7
         result.append(max(0.0, min(1.0, blended)))
     return result
+
+
+def _char_ngram_sim(a: str, b: str) -> float:
+    """Character n-gram similarity (3-gram + 4-gram Jaccard).
+
+    Works across languages and garbled text because it compares character
+    sequences, not words. Returns 0.0-1.0.
+    """
+    if not a or not b:
+        return 0.0
+    # 3-grams
+    a3 = set(a[i:i+3] for i in range(max(len(a) - 2, 1)))
+    b3 = set(b[i:i+3] for i in range(max(len(b) - 2, 1)))
+    jaccard3 = len(a3 & b3) / max(len(a3 | b3), 1)
+    # 4-grams
+    a4 = set(a[i:i+4] for i in range(max(len(a) - 3, 1)))
+    b4 = set(b[i:i+4] for i in range(max(len(b) - 3, 1)))
+    jaccard4 = len(a4 & b4) / max(len(a4 | b4), 1)
+    return (jaccard3 + jaccard4) / 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -720,11 +744,12 @@ def evaluate_assignment():
                     min_floor = max(min_floor, overlap_ratio * 0.5)
             combined = max(combined, min_floor)
 
-            # GUARANTEE: any submission with readable text gets at least 25% marks.
+            # GUARANTEE: any submission with readable text gets at least 30% marks.
             # A student who submitted a real document deserves credit for effort
-            # even if the text extraction is imperfect or keywords don't match.
+            # even if the text extraction is imperfect, keywords don't match,
+            # or the student wrote in a different language.
             if len(it["text"]) > 20:  # meaningful text, not garbage
-                combined = max(combined, 0.25)
+                combined = max(combined, 0.30)
 
             match_pct = _r1(combined * 100.0)
             obtained = _r1(combined * max_marks)
