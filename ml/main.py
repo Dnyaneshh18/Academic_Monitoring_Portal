@@ -465,13 +465,15 @@ def evaluate_assignment():
     Body:
       {
         "max_marks": 10,
-        "model_answer": "...",                    # optional
-        "keywords": ["...", ...],                 # optional (else extracted)
-        "submissions": [{"submission_id": "hs_1",
+        "model_answer": "...",                    # optional (else keywords)
+        "keywords": ["array", "pointer"],        # optional (else extracted)
+        "submissions": [{"student_id": "st_1",    # or "submission_id"
                           "text": "...",          # pre-extracted text
                           "pdf_base64": "..."}]   # or raw PDF (extracted via pypdf)
       }
-    Returns: {"results": [{submission_id, obtained, percentage, remark}]}
+    Returns: {"results": [{student_id, submission_id?, obtained,
+                            semantic_score, keyword_score, completeness_score,
+                            matched_keywords, remark}]}
     """
     try:
         data = request.get_json(silent=True)
@@ -503,74 +505,88 @@ def evaluate_assignment():
         for s in submissions:
             if not isinstance(s, dict):
                 continue
-            sid = str(s.get("submission_id") or "")
+            sid = str(s.get("student_id") or s.get("submission_id") or "")
             text = str(s.get("text") or "").strip()
             if not text and s.get("pdf_base64"):
                 try:
                     text = extract_text_from_pdf(base64.b64decode(s["pdf_base64"]))
                 except Exception:  # noqa: BLE001 — unreadable PDF → empty text
                     text = ""
-            items.append((sid, text))
+            items.append({
+                "student_id": sid,
+                "submission_id": str(s.get("submission_id") or "") or None,
+                "text": text,
+            })
 
         if not items:
             return jsonify({"results": []})
 
         # Semantic similarity for all submissions with readable text.
         semantic_by_pos = {}
-        readable = [t for _, t in items if t]
+        readable = [it["text"] for it in items if it["text"]]
         if readable:
             sims = _semantic_scores(reference, readable)
             pos = 0
-            for i in range(len(items)):
-                if items[i][1]:
+            for i, it in enumerate(items):
+                if it["text"]:
                     semantic_by_pos[i] = sims[pos]
                     pos += 1
 
         results = []
-        for i, (sid, text) in enumerate(items):
-            if not text:
+        for i, it in enumerate(items):
+            sid = it["student_id"]
+            if not it["text"]:
                 results.append({
-                    "submission_id": sid,
+                    "student_id": sid,
                     "obtained": 0.0,
-                    "percentage": 0.0,
-                    "remark": "Auto-evaluated: no readable text found in submission — check the file format."
+                    "semantic_score": 0.0,
+                    "keyword_score": 0.0,
+                    "completeness_score": 0.0,
+                    "matched_keywords": [],
+                    "remark": "Auto-evaluated: No readable text found in submission."
                 })
                 continue
 
             sem = semantic_by_pos[i]
-            matched = _keyword_coverage(text, keywords)
+            matched = _keyword_coverage(it["text"], keywords)
             kw_score = len(matched) / len(keywords) if keywords else None
-            completeness = min(len(text) / max(len(reference), 1), 1.0)
+            completeness = min(len(it["text"]) / max(len(reference), 1), 1.0)
 
             if kw_score is None:
                 # No keywords: redistribute the weights over the remaining parts.
-                combined = (sem * 0.6 + completeness * 0.1) / 0.7
-                kw_note = ""
+                combined = (sem * 0.60 + completeness * 0.10) / 0.70
             else:
-                combined = sem * 0.6 + kw_score * 0.3 + completeness * 0.1
-                kw_note = (
-                    f" (Keywords: {len(matched)}/{len(keywords)} found: [{', '.join(matched)}])"
-                    if keywords
-                    else ""
-                )
+                combined = sem * 0.60 + kw_score * 0.30 + completeness * 0.10
 
             combined = max(0.0, min(1.0, combined))
+            match_pct = _r1(combined * 100.0)
             obtained = _r1(combined * max_marks)
-            percentage = _r1(obtained / max_marks * 100.0)
 
-            if percentage >= 85:
+            if match_pct >= 85:
                 note = "Strong match."
-            elif percentage >= 60:
+            elif match_pct >= 60:
                 note = "Partial match — review weak areas."
             else:
                 note = "Weak match — review required."
 
-            results.append({
-                "submission_id": sid,
+            kw_note = (
+                f" (Keywords: {len(matched)}/{len(keywords)} found: [{', '.join(matched)}])"
+                if keywords
+                else ""
+            )
+
+            result = {
+                "student_id": sid,
                 "obtained": obtained,
-                "percentage": percentage,
-                "remark": f"Auto-evaluated: {percentage}% match. {note}{kw_note}"
-            })
+                "semantic_score": _r3(sem),
+                "keyword_score": _r3(kw_score if kw_score is not None else 0.0),
+                "completeness_score": _r3(completeness),
+                "matched_keywords": matched,
+                "remark": f"Auto-evaluated: {match_pct}% match. {note}{kw_note}",
+            }
+            if it.get("submission_id"):
+                result["submission_id"] = it["submission_id"]
+            results.append(result)
 
         return jsonify({"results": results})
     except Exception as e:  # noqa: BLE001 — report any failure as HTTP 500
