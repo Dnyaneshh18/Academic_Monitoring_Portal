@@ -125,11 +125,11 @@ export async function POST(req: NextRequest) {
   let ai: AiEvalResult | null = null;
   let aiError: string | null = null;
   if (subRow) {
-    const meta = one<{ model_answer: string | null; keywords: string | null; max_marks: number }>(
-      "SELECT model_answer, keywords, max_marks FROM homework_tasks WHERE id = ?",
+    const meta = one<{ model_answer: string | null; keywords: string | null; max_marks: number; title: string }>(
+      "SELECT model_answer, keywords, max_marks, title FROM homework_tasks WHERE id = ?",
       [taskId]
     );
-    const modelAnswer = (meta?.model_answer || "").trim();
+    const modelAnswer = (meta?.model_answer || meta?.title || "").trim();
     let keywords: string[] = [];
     if (meta?.keywords) {
       try {

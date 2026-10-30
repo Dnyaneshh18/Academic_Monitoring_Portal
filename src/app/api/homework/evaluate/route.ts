@@ -75,11 +75,11 @@ export async function POST(req: NextRequest) {
   );
   if (!sub) return json({ error: "You have not submitted this assignment yet" }, 404);
 
-  const meta = one<{ model_answer: string | null; keywords: string | null; max_marks: number }>(
-    "SELECT model_answer, keywords, max_marks FROM homework_tasks WHERE id = ?",
+  const meta = one<{ model_answer: string | null; keywords: string | null; max_marks: number; title: string }>(
+    "SELECT model_answer, keywords, max_marks, title FROM homework_tasks WHERE id = ?",
     [taskId]
   );
-  const modelAnswer = (meta?.model_answer || "").trim();
+  const modelAnswer = (meta?.model_answer || meta?.title || "").trim();
   let keywords: string[] = [];
   if (meta?.keywords) {
     try {
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     }
   }
   if (!modelAnswer && !keywords.length) {
-    return json({ error: "No model answer or keywords configured for this assignment" }, 400);
+    return json({ error: "No title, model answer, or keywords configured for this assignment" }, 400);
   }
 
   const extracted = await extractTextFromRow(sub);

@@ -81,16 +81,16 @@ export async function POST(req: NextRequest) {
   const preview = body.preview === true;
   const apply = body.apply === true || !preview;
 
-  const task = one<{ faculty_id: string; model_answer: string | null; instructions: string | null; keywords: string | null; max_marks: number }>(
-    "SELECT faculty_id, model_answer, instructions, keywords, max_marks FROM homework_tasks WHERE id = ?",
+  const task = one<{ faculty_id: string; model_answer: string | null; instructions: string | null; keywords: string | null; max_marks: number; title: string }>(
+    "SELECT faculty_id, model_answer, instructions, keywords, max_marks, title FROM homework_tasks WHERE id = ?",
     [taskId]
   );
   if (!task || task.faculty_id !== user.facultyId) return json({ error: "Not found" }, 404);
 
-  const modelAnswer = task.model_answer || task.instructions || "";
+  const modelAnswer = task.model_answer || task.instructions || task.title || "";
   const keywords = parseKeywords(task.keywords);
   if (!modelAnswer && !keywords.length) {
-    return json({ error: "Add a model answer / key points or key concepts to this assignment before auto-evaluating." }, 400);
+    return json({ error: "Cannot evaluate — no title, model answer, or keywords found for this assignment." }, 400);
   }
 
   const subs = all<SubmissionRow>("SELECT * FROM homework_submissions WHERE task_id = ?", [taskId]);
