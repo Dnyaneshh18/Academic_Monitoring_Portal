@@ -461,6 +461,7 @@ function migrate(db: DatabaseSync) {
       ai_semantic_score REAL,
       ai_keyword_score REAL,
       ai_completeness_score REAL,
+      ai_plagiarism_score REAL,
       ai_matched_keywords TEXT,
       ai_remark TEXT,
       ai_evaluated_at TEXT,
@@ -516,6 +517,11 @@ function migrate(db: DatabaseSync) {
   }
   try {
     db.exec("ALTER TABLE notices ADD COLUMN college_id TEXT");
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec("ALTER TABLE homework_submissions ADD COLUMN ai_plagiarism_score REAL");
   } catch {
     /* exists */
   }

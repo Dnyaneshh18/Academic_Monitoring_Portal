@@ -660,6 +660,7 @@ def evaluate_assignment():
                 "student_id": sid,
                 "submission_id": str(s.get("submission_id") or "") or None,
                 "text": text,
+                "size": s.get("size"),
             })
 
         if not items:
@@ -744,23 +745,48 @@ def evaluate_assignment():
                     min_floor = max(min_floor, overlap_ratio * 0.5)
             combined = max(combined, min_floor)
 
-            # GUARANTEE: any submission with readable text gets at least 40% marks.
+            # GUARANTEE: any submission with readable text gets at least 60% marks.
             # A student who submitted a real document deserves credit for effort
             # even if the text extraction is imperfect, keywords don't match,
             # or the student wrote in a different language.
             if len(it["text"]) > 20:  # meaningful text, not garbage
-                combined = max(combined, 0.40)
+                combined = max(combined, 0.60)
 
             # Length-based effort score: longer submissions = more effort
-            # Up to 15% bonus for very thorough answers (500+ chars)
-            length_bonus = min(len(it["text"]) / 500.0, 1.0) * 0.15
+            # Up to 20% bonus for very thorough answers (500+ chars)
+            length_bonus = min(len(it["text"]) / 500.0, 1.0) * 0.20
             combined = min(combined + length_bonus, 1.0)
 
             # Content diversity score: many unique words = real answer, not garbage
-            # Up to 10% bonus for diverse vocabulary (100+ unique words)
+            # Up to 15% bonus for diverse vocabulary (100+ unique words)
             unique_words = len(set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", it["text"].lower())))
-            diversity_bonus = min(unique_words / 100.0, 1.0) * 0.10
+            diversity_bonus = min(unique_words / 100.0, 1.0) * 0.15
             combined = min(combined + diversity_bonus, 1.0)
+
+            # File-size-based effort score: larger files suggest more work.
+            # If we know the submission size (passed as "size" field), give
+            # bonus marks for larger documents. A 500KB PDF deserves more credit
+            # than a 10KB text file.
+            # Up to 15% bonus for very large files (500KB+)
+            file_size = it.get("size")
+            if file_size:
+                size_kb = float(file_size) / 1024.0
+                size_bonus = min(size_kb / 500.0, 1.0) * 0.15
+                combined = min(combined + size_bonus, 1.0)
+
+            # Character n-gram similarity (char 3-gram + 4-gram Jaccard)
+            # This catches paraphrased or differently-worded answers that
+            # still share character patterns with the reference.
+            ref_3grams = set(reference[i:i+3] for i in range(len(reference) - 2))
+            ref_4grams = set(reference[i:i+4] for i in range(len(reference) - 3))
+            sub_3grams = set(it["text"][i:i+3] for i in range(len(it["text"]) - 2))
+            sub_4grams = set(it["text"][i:i+4] for i in range(len(it["text"]) - 3))
+            jaccard_3 = len(ref_3grams & sub_3grams) / max(len(ref_3grams | sub_3grams), 1)
+            jaccard_4 = len(ref_4grams & sub_4grams) / max(len(ref_4grams | sub_4grams), 1)
+            char_sim = (jaccard_3 + jaccard_4) / 2.0
+            # Up to 10% bonus from character n-gram similarity
+            char_bonus = char_sim * 0.10
+            combined = min(combined + char_bonus, 1.0)
 
             match_pct = _r1(combined * 100.0)
             obtained = _r1(combined * max_marks)

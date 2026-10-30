@@ -149,11 +149,11 @@ export async function POST(req: NextRequest) {
         model_answer: modelAnswer,
         keywords,
         max_marks: meta?.max_marks ?? 10,
-        submissions: [{ student_id: st.id, submission_id: subRow.id, text }]
+        submissions: [{ student_id: st.id, submission_id: subRow.id, text, size: file.size }]
       };
       if (!text && ext === ".pdf") {
         // Let the ML service try extracting from the raw PDF bytes.
-        payload.submissions = [{ student_id: st.id, submission_id: subRow.id, pdf_base64: fileData.toString("base64") }];
+        payload.submissions = [{ student_id: st.id, submission_id: subRow.id, pdf_base64: fileData.toString("base64"), size: file.size }];
       }
       try {
         const resp = await fetch(`${ML_SERVICE_URL}/evaluate-assignment`, {
@@ -184,6 +184,7 @@ export async function POST(req: NextRequest) {
             subRow.id
           ]
         );
+      console.log(`[submit] AI saved: submission=${subRow.id} ai_obtained=${r.obtained} remark='${r.remark}'`);
           }
         }
       } catch (e) {

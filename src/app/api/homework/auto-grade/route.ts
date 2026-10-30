@@ -16,6 +16,7 @@ type SubmissionRow = {
   stored_path: string;
   file_data: unknown;
   mime: string | null;
+  size: number | null;
 };
 
 function blobToBuffer(blob: unknown): Buffer | null {
@@ -100,12 +101,13 @@ export async function POST(req: NextRequest) {
   for (const sub of subs) {
     const extracted = await extractSubmissionText(sub);
     console.log(`[auto-grade] submission=${sub.id} student=${sub.student_id} ` +
-      `file=${sub.file_name} text_len=${extracted.text.length} ` +
+      `file=${sub.file_name} size=${sub.size} text_len=${extracted.text.length} ` +
       `text_preview='${extracted.text.slice(0, 200).replace(/\n/g, " ")}'`);
     items.push({
       student_id: sub.student_id,
       submission_id: sub.id,
       text: extracted.text,
+      size: sub.size,
       ...(extracted.pdf_base64 ? { pdf_base64: extracted.pdf_base64 } : {})
     });
   }
@@ -163,6 +165,12 @@ export async function POST(req: NextRequest) {
         r.remark ?? "",
         target
       ]);
+      // Verify the save by reading back the row
+      const saved = one<{ obtained: number | null; ai_obtained: number | null; verified: number }>(
+        "SELECT obtained, ai_obtained, verified FROM homework_submissions WHERE id = ?",
+        [target]
+      );
+      console.log(`[auto-grade] SAVED: submission=${target} student=${r.student_id} ` +\n        `obtained=${saved?.obtained} ai_obtained=${saved?.ai_obtained} verified=${saved?.verified}`);
     }
   }
 
