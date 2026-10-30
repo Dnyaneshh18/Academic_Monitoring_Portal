@@ -360,6 +360,13 @@ CREATE TABLE IF NOT EXISTS homework_submissions (
   verified INTEGER DEFAULT 0,
   obtained DOUBLE PRECISION,
   remark TEXT,
+  ai_obtained DOUBLE PRECISION,
+  ai_semantic_score DOUBLE PRECISION,
+  ai_keyword_score DOUBLE PRECISION,
+  ai_completeness_score DOUBLE PRECISION,
+  ai_matched_keywords TEXT,
+  ai_remark TEXT,
+  ai_evaluated_at TEXT,
   UNIQUE (task_id, student_id)
 );
 CREATE TABLE IF NOT EXISTS ml_scores (

@@ -28,6 +28,13 @@ type Task = {
   submitted_at?: string;
   verified?: number;
   obtained?: number;
+  ai_obtained?: number | null;
+  ai_semantic_score?: number | null;
+  ai_keyword_score?: number | null;
+  ai_completeness_score?: number | null;
+  ai_matched_keywords?: string | null;
+  ai_remark?: string | null;
+  ai_evaluated_at?: string | null;
 };
 
 type Row = {
@@ -42,6 +49,13 @@ type Row = {
     verified: number;
     obtained: number;
     remark: string;
+    ai_obtained: number | null;
+    ai_semantic_score: number | null;
+    ai_keyword_score: number | null;
+    ai_completeness_score: number | null;
+    ai_matched_keywords: string | null;
+    ai_remark: string | null;
+    ai_evaluated_at: string | null;
   } | null;
 };
 
@@ -196,8 +210,21 @@ export default function HomeworkPage() {
     fd.append("taskId", taskId);
     fd.append("file", f);
     try {
-      await apiForm("/api/homework/submit", fd);
-      setMsg("Submitted.");
+      const r = await apiForm<{ ok?: boolean; ai?: { obtained: number; remark: string; semantic_score: number; keyword_score: number; completeness_score: number; matched_keywords: string[] } | null; ai_error?: string }>(
+        "/api/homework/submit",
+        fd
+      );
+      if (!r?.ok) {
+        setError("Upload failed");
+        return;
+      }
+      if (r.ai) {
+        setMsg(`Uploaded. 🤖 AI estimate: ${r.ai.obtained} marks — ${r.ai.remark}`);
+      } else if (r.ai_error) {
+        setMsg(`Uploaded. AI evaluation unavailable (${r.ai_error}). Faculty can still review.`);
+      } else {
+        setMsg("Submitted.");
+      }
       const hw = await api<{ tasks: Task[] }>("/api/homework");
       setTasks(hw.tasks || []);
     } catch (e) {
@@ -349,6 +376,18 @@ export default function HomeworkPage() {
                   {t.submission_id ? (t.verified ? `Verified · ${t.obtained}/${t.max_marks}` : "Submitted") : "Not submitted"}
                 </span>
               </div>
+              {t.submission_id && t.ai_obtained !== null && t.ai_obtained !== undefined ? (
+                <div className="mt-2 rounded-lg border border-brand-200 bg-brand-50 p-2 text-xs text-brand-900">
+                  <p className="font-semibold">🤖 AI estimate: {t.ai_obtained} / {t.max_marks} marks</p>
+                  <p className="mt-0.5 text-brand-700">{t.ai_remark}</p>
+                  {t.ai_matched_keywords ? (
+                    <p className="mt-0.5 text-ink-600">
+                      Keywords matched: {JSON.parse(t.ai_matched_keywords || "[]").join(", ") || "—"}
+                    </p>
+                  ) : null}
+                  {t.ai_evaluated_at ? <p className="text-ink-400">Evaluated at {t.ai_evaluated_at}</p> : null}
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <input
                   type="file"
@@ -634,6 +673,11 @@ export default function HomeworkPage() {
                           title={aiResults[s.id].remark}
                         >
                           AI suggests {aiResults[s.id].obtained}
+                        </div>
+                      ) : null}
+                      {s.submission?.ai_obtained !== null && s.submission?.ai_obtained !== undefined && !aiResults?.[s.id] ? (
+                        <div className="mt-1 text-[11px] text-ink-500" title={s.submission.ai_remark || ""}>
+                          Upload-time AI estimate: {s.submission.ai_obtained} / {detail.task.max_marks}
                         </div>
                       ) : null}
                     </td>
