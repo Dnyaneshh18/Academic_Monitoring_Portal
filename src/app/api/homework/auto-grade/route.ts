@@ -143,10 +143,16 @@ export async function POST(req: NextRequest) {
           r.student_id
         ])?.id;
       if (!target) continue;
-      run("UPDATE homework_submissions SET obtained = ?, remark = ?, ai_plagiarism_score = ?, verified = 1 WHERE id = ?", [
+      run("UPDATE homework_submissions SET obtained = ?, remark = ?, ai_obtained = ?, ai_semantic_score = ?, ai_keyword_score = ?, ai_completeness_score = ?, ai_plagiarism_score = ?, ai_matched_keywords = ?, ai_remark = ?, ai_evaluated_at = datetime('now'), verified = 1 WHERE id = ?", [
         r.obtained ?? 0,
         r.remark ?? "",
+        r.obtained ?? 0,
+        r.semantic_score ?? 0,
+        r.keyword_score ?? 0,
+        r.completeness_score ?? 0,
         r.plagiarism_score ?? 0,
+        JSON.stringify(r.matched_keywords || []),
+        r.remark ?? "",
         target
       ]);
     }
