@@ -95,6 +95,16 @@ export default function HomeworkPage() {
   const [evaluating, setEvaluating] = useState(false);
   const [aiResults, setAiResults] = useState<Record<string, AiResult> | null>(null);
   const [prevMarks, setPrevMarks] = useState<Record<string, number | null>>({});
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    instructions: "",
+    modelAnswer: "",
+    keywords: "",
+    maxMarks: 20,
+    dueDate: ""
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const selected = useMemo(
     () =>
@@ -280,6 +290,55 @@ export default function HomeworkPage() {
 
   function isAiSuggested(s: Row) {
     return (s.submission?.remark || "").trim().startsWith("Auto-evaluated");
+  }
+
+  function startEdit(task: Task) {
+    setEditTask(task);
+    setEditForm({
+      title: task.title || "",
+      instructions: task.instructions || "",
+      modelAnswer: task.model_answer || "",
+      keywords: task.keywords || "",
+      maxMarks: task.max_marks || 20,
+      dueDate: task.due_date || ""
+    });
+    setError("");
+    setMsg("");
+  }
+
+  async function saveEdit() {
+    if (!editTask) return;
+    setSavingEdit(true);
+    setError("");
+    try {
+      const r = await api<{ ok?: boolean; error?: string }>("/api/homework/update", {
+        method: "POST",
+        body: JSON.stringify({
+          taskId: editTask.id,
+          title: editForm.title,
+          instructions: editForm.instructions,
+          modelAnswer: editForm.modelAnswer,
+          keywords: editForm.keywords,
+          maxMarks: editForm.maxMarks,
+          dueDate: editForm.dueDate
+        })
+      });
+      if (!r?.ok) {
+        setError(r?.error || "Could not save changes");
+        return;
+      }
+      setMsg("Assignment updated.");
+      setEditTask(null);
+      const hw = await api<{ tasks: Task[] }>("/api/homework");
+      setTasks(hw.tasks || []);
+      if (detail && detail.task.id === editTask.id) {
+        await openTask(editTask.id);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save changes");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function handleAutoEvaluate() {
@@ -602,6 +661,9 @@ export default function HomeworkPage() {
                   <button className="btn-ghost text-xs" onClick={() => openTask(t.id)}>
                     Open submissions
                   </button>
+                  <button className="btn-ghost text-xs" onClick={() => startEdit(t)}>
+                    Edit
+                  </button>
                 </td>
               </tr>
             ))}
@@ -728,6 +790,73 @@ export default function HomeworkPage() {
             </table>
           </div>
         </section>
+      ) : null}
+
+      {editTask ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !savingEdit && setEditTask(null)}>
+          <div className="glass w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-display text-xl">Edit Assignment</h2>
+            <p className="mt-1 text-sm text-ink-600">Update the title, model answer, or key concepts for AI evaluation.</p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="label">Title</label>
+                <input className="field" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Short instructions (optional)</label>
+                <textarea className="field" rows={2} value={editForm.instructions} onChange={(e) => setEditForm({ ...editForm, instructions: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Model Answer / Key Points</label>
+                <textarea
+                  className="field"
+                  rows={4}
+                  value={editForm.modelAnswer}
+                  onChange={(e) => setEditForm({ ...editForm, modelAnswer: e.target.value })}
+                  placeholder="Reference answer or key points a good submission should cover — used by the local NLP auto-evaluator…"
+                />
+              </div>
+              <div>
+                <label className="label">Key Concepts (comma-separated, optional)</label>
+                <input
+                  className="field"
+                  value={editForm.keywords}
+                  onChange={(e) => setEditForm({ ...editForm, keywords: e.target.value })}
+                  placeholder="e.g. bubble sort, complexity, stability"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Max Marks</label>
+                  <input
+                    type="number"
+                    className="field"
+                    value={editForm.maxMarks}
+                    onChange={(e) => setEditForm({ ...editForm, maxMarks: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Due Date</label>
+                  <input
+                    type="date"
+                    className="field"
+                    value={editForm.dueDate}
+                    onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                  />
+                </div>
+              </div>
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn-ghost" onClick={() => setEditTask(null)} disabled={savingEdit}>
+                Cancel
+              </button>
+              <button className="btn-accent" onClick={saveEdit} disabled={savingEdit}>
+                {savingEdit ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );
