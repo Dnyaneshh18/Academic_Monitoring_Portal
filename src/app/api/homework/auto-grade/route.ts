@@ -144,9 +144,9 @@ export async function POST(req: NextRequest) {
         ])?.id;
       if (!target) continue;
       run("UPDATE homework_submissions SET obtained = ?, remark = ?, ai_plagiarism_score = ?, verified = 1 WHERE id = ?", [
-        r.obtained,
-        r.remark,
-        r.plagiarism_score,
+        r.obtained ?? 0,
+        r.remark ?? "",
+        r.plagiarism_score ?? 0,
         target
       ]);
     }

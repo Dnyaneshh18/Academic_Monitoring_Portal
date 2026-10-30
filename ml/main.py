@@ -348,7 +348,6 @@ def _semantic_scores(reference: str, submission_texts):
         except Exception as e:  # noqa: BLE001 — half-initialized model → fall back
             print("[evaluate-assignment] SentenceTransformer encoding failed — using TF-IDF fallback:", e)
     corpus = [reference] + submission_texts
-    corpus = [reference] + submission_texts
     try:
         tf = TfidfVectorizer(lowercase=True, stop_words="english").fit_transform(corpus)
     except ValueError:  # empty vocabulary
@@ -620,6 +619,7 @@ def evaluate_assignment():
                     "semantic_score": 0.0,
                     "keyword_score": 0.0,
                     "completeness_score": 0.0,
+                    "plagiarism_score": 0.0,
                     "matched_keywords": [],
                     "remark": "Auto-evaluated: No readable text found in submission."
                 })
