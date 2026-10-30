@@ -106,9 +106,28 @@ Check connection: open `/api/health` — `postgres.connected` should be `true`.
 
 ## ML Microservice
 
-The risk-scoring engine is a Python microservice powered by scikit-learn.
+The risk-scoring engine **and** the local NLP auto-evaluation engine are both powered by this Python microservice. **It must be running for AI evaluation of student submissions to work.**
 
-### Running locally (without Docker)
+### ⚠️ AI Evaluation Requires the ML Service
+
+Student assignment uploads are **automatically evaluated** by the local NLP engine (100% local — no external APIs). This evaluation happens inside the ML microservice on port 8000. **If the ML service is not running, uploads succeed but no AI estimate is produced.**
+
+### One-click startup
+
+**Windows:**
+```cmd
+ml\start-ml.bat
+```
+
+**macOS / Linux:**
+```bash
+cd ml && ./start-ml.sh
+```
+
+Both scripts auto-create a virtual environment, install dependencies, and start the service on `http://localhost:8000`.
+
+### Manual startup
+
 ```bash
 cd ml
 pip install -r requirements.txt
@@ -116,11 +135,15 @@ python main.py
 # Service available at http://localhost:8000
 ```
 
-### Running with Docker Compose
+### Verify it's running
+
+Open http://localhost:8000/health in your browser — you should see `{"status":"ok"}`.
+
+### Docker Compose
+
 ```bash
 docker-compose up --build
 ```
-The ML service starts automatically. The Next.js app connects to it via `ML_SERVICE_URL`.
 
 ### Environment Variable
 | Variable | Default | Description |

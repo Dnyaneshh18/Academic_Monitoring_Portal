@@ -180,7 +180,7 @@ function loadFeatures(opts?: { classIds?: string[]; collegeId?: string }): Feat[
 
 function callMlService(
   payload: object
-): { model: RiskModel; students: StudentRisk[]; clusters: ClusterSummary[] } {
+): { model: RiskModel; students: StudentRisk[]; clusters: ClusterSummary[] } | null {
   try {
     const body = JSON.stringify(payload);
     // Use execSync to call curl synchronously so the outer function stays sync
@@ -190,13 +190,15 @@ function callMlService(
     );
     return JSON.parse(raw) as { model: RiskModel; students: StudentRisk[]; clusters: ClusterSummary[] };
   } catch (e: unknown) {
-    throw new Error(`ML service error: ${(e as Error).message}`);
+    // ML service unreachable — log but do not crash the page
+    console.warn("[amp] ML service unreachable:", (e as Error).message);
+    return null;
   }
 }
 
 export function scoreStudents(
   opts?: { classIds?: string[]; studentId?: string; collegeId?: string }
-): { model: RiskModel; students: StudentRisk[]; clusters: ClusterSummary[] } {
+): { model: RiskModel | null; students: StudentRisk[]; clusters: ClusterSummary[] } {
   const allRows = loadFeatures({ collegeId: opts?.collegeId, classIds: opts?.classIds });
   const payload = {
     students: allRows.map((r) => ({
@@ -215,6 +217,10 @@ export function scoreStudents(
     collegeId: opts?.collegeId ?? null,
   };
   const result = callMlService(payload);
+  if (!result) {
+    // ML service down — return empty result so the page renders instead of 500
+    return { model: null, students: [], clusters: [] };
+  }
   persistMl(result.model, result.students);
   return { model: result.model, students: result.students, clusters: result.clusters };
 }
