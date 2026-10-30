@@ -44,6 +44,41 @@ export function getDb(): DatabaseSync {
       /* exists */
     }
     try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_obtained REAL");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_semantic_score REAL");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_keyword_score REAL");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_completeness_score REAL");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_matched_keywords TEXT");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_remark TEXT");
+    } catch {
+      /* exists */
+    }
+    try {
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_evaluated_at TEXT");
+    } catch {
+      /* exists */
+    }
+    try {
       globalForDb.ampDb.exec("ALTER TABLE homework_tasks ADD COLUMN model_answer TEXT");
     } catch {
       /* exists */
@@ -132,6 +167,13 @@ async function syncPostgres(db: DatabaseSync) {
       await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS model_answer TEXT");
       await pool.query("ALTER TABLE homework_tasks ADD COLUMN IF NOT EXISTS keywords TEXT");
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS file_data BYTEA");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_obtained DOUBLE PRECISION");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_semantic_score DOUBLE PRECISION");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_keyword_score DOUBLE PRECISION");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_completeness_score DOUBLE PRECISION");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_matched_keywords TEXT");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_remark TEXT");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_evaluated_at TEXT");
     } catch {
       /* older pg */
     }
@@ -409,6 +451,13 @@ function migrate(db: DatabaseSync) {
       verified INTEGER DEFAULT 0,
       obtained REAL,
       remark TEXT,
+      ai_obtained REAL,
+      ai_semantic_score REAL,
+      ai_keyword_score REAL,
+      ai_completeness_score REAL,
+      ai_matched_keywords TEXT,
+      ai_remark TEXT,
+      ai_evaluated_at TEXT,
       UNIQUE (task_id, student_id)
     );
     CREATE TABLE IF NOT EXISTS ml_scores (
