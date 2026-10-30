@@ -16,6 +16,14 @@ import base64
 import io
 import os
 import re
+import sys
+
+# Ensure UTF-8 output on Windows consoles so Unicode chars never crash the server
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from collections import Counter
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -610,6 +618,11 @@ def predict():
 
         return jsonify({"model": model_out, "students": students, "clusters": clusters})
     except Exception as e:  # noqa: BLE001 — report any failure as HTTP 500
+        import traceback
+        try:
+            traceback.print_exc()
+        except Exception:
+            pass
         return jsonify({"error": str(e)}), 500
 
 
@@ -743,7 +756,7 @@ def evaluate_assignment():
                   f"reference_preview='{reference[:300].replace(chr(10), ' ')}'")
             print(f"[evaluate-assignment] keywords={keywords}")
 
-            sem = semantic_by_pos[item_i]
+            sem = semantic_by_pos.get(item_i, 0.0)
             matched = _keyword_coverage(it["text"], keywords)
             kw_score = len(matched) / len(keywords) if keywords else None
 
@@ -848,7 +861,7 @@ def evaluate_assignment():
 
             plag_note = ""
             if plagiarism_score < 0.4:
-                plag_note = " ⚠ Possible plagiarism detected."
+                plag_note = " [Warning: Possible plagiarism detected.]"
             elif plagiarism_score < 0.7:
                 plag_note = " (Some copied content detected.)"
 
