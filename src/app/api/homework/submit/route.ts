@@ -4,6 +4,7 @@ import path from "path";
 import { ensureDb, one, run } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
 import { uid } from "@/lib/ids";
+import { flushPgWrites } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -153,14 +154,14 @@ export async function POST(req: NextRequest) {
       };
       if (!text) {
         if (ext === ".pdf") {
-          // Let the ML service try extracting from the raw PDF bytes.
+          // PDF that pdf-parse couldn't read — let the ML service try pypdf.
           payload.submissions = [{ student_id: st.id, submission_id: subRow.id, pdf_base64: fileData.toString("base64"), size: file.size }];
         } else if (ext === ".docx" || ext === ".doc") {
-          // Send raw bytes for ML-side python-docx extraction
+          // Word document — send raw bytes for ML-side python-docx extraction.
           payload.submissions = [{ student_id: st.id, submission_id: subRow.id, docx_base64: fileData.toString("base64"), size: file.size }];
         }
-        // Other types (.pptx, .zip, images): text stays "" but size is passed
-        // so the ML service can give an effort-based score instead of 0.
+        // Other non-text files (.pptx, .zip, images): text stays "" but size is
+        // still passed so the ML service can award the size-based effort bonus.
       }
       try {
         const resp = await fetch(`${ML_SERVICE_URL}/evaluate-assignment`, {
@@ -178,7 +179,8 @@ export async function POST(req: NextRequest) {
             ai = r;
       run(
           `UPDATE homework_submissions
-           SET ai_obtained = ?, ai_semantic_score = ?, ai_keyword_score = ?, ai_completeness_score = ?, ai_plagiarism_score = ?, ai_matched_keywords = ?, ai_remark = ?, ai_evaluated_at = datetime('now')
+           SET ai_obtained = ?, ai_semantic_score = ?, ai_keyword_score = ?, ai_completeness_score = ?, ai_plagiarism_score = ?, ai_matched_keywords = ?, ai_remark = ?, ai_evaluated_at = datetime('now'),
+               obtained = ?, remark = ?, verified = 1
            WHERE id = ?`,
           [
             r.obtained ?? 0,
@@ -188,9 +190,16 @@ export async function POST(req: NextRequest) {
             r.plagiarism_score ?? 0,
             JSON.stringify(r.matched_keywords || []),
             r.remark ?? "",
+            r.obtained ?? 0,
+            r.remark ?? "",
             subRow.id
           ]
         );
+      try {
+        await flushPgWrites();
+      } catch (e) {
+        console.error("[submit] flush error:", e);
+      }
       console.log(`[submit] AI saved: submission=${subRow.id} ai_obtained=${r.obtained} remark='${r.remark}'`);
           }
         }

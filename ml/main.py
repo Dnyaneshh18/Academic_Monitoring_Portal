@@ -32,7 +32,7 @@ try:  # pypdf is optional at import time — PDF text extraction degrades gracef
 except Exception:  # noqa: BLE001
     PdfReader = None
 
-try:  # python-docx is optional — Word document text extraction degrades gracefully
+try:  # python-docx for .docx text extraction
     from docx import Document as DocxDocument
 except Exception:  # noqa: BLE001
     DocxDocument = None
@@ -235,7 +235,7 @@ def extract_text_from_pdf(data) -> str:
 
 
 def extract_text_from_docx(data) -> str:
-    """Extract text from DOCX bytes using python-docx."""
+    """Extract text from a .docx bytes object using python-docx."""
     if DocxDocument is None:
         raise RuntimeError("python-docx is not installed")
     doc = DocxDocument(io.BytesIO(data))
@@ -673,7 +673,7 @@ def evaluate_assignment():
             if not text and s.get("docx_base64"):
                 try:
                     text = extract_text_from_docx(base64.b64decode(s["docx_base64"]))
-                except Exception:  # noqa: BLE001 — unreadable DOCX → empty text
+                except Exception:  # noqa: BLE001
                     text = ""
             items.append({
                 "student_id": sid,
@@ -697,19 +697,20 @@ def evaluate_assignment():
                     pos += 1
 
         results = []
-        for i, it in enumerate(items):
+        for item_i, it in enumerate(items):
             sid = it["student_id"]
+
+            # Non-text or unreadable submission
             if not it["text"]:
-                # Non-text submission (Word without python-docx, PPT, image, ZIP).
-                # Give an effort-based score based on file size instead of hard 0.
                 file_size = it.get("size")
                 effort = 0.0
                 if file_size and float(file_size) > 0:
                     size_kb = float(file_size) / 1024.0
-                    effort = max(0.10, min(0.40, size_kb / 1250.0 + 0.10))  # 10–40% based on size
+                    # 10-40% based on file size (10KB->10%, 500KB->40%)
+                    effort = max(0.10, min(0.40, size_kb / 1250.0 + 0.10))
                 if effort > 0:
-                    effort_obtained = round(effort * max_marks, 1)
-                    result = {
+                    effort_obtained = _r1(effort * max_marks)
+                    results.append({
                         "student_id": sid,
                         "obtained": effort_obtained,
                         "semantic_score": 0.0,
@@ -718,9 +719,9 @@ def evaluate_assignment():
                         "plagiarism_score": 1.0,
                         "matched_keywords": [],
                         "remark": f"Auto-evaluated: Text not extractable (Word/PPT/image). Effort score: {effort_obtained}/{max_marks}. Faculty review recommended."
-                    }
+                    })
                 else:
-                    result = {
+                    results.append({
                         "student_id": sid,
                         "obtained": 0.0,
                         "semantic_score": 0.0,
@@ -729,10 +730,9 @@ def evaluate_assignment():
                         "plagiarism_score": 0.0,
                         "matched_keywords": [],
                         "remark": "Auto-evaluated: No readable text found in submission."
-                    }
+                    })
                 if it.get("submission_id"):
-                    result["submission_id"] = it["submission_id"]
-                results.append(result)
+                    results[-1]["submission_id"] = it["submission_id"]
                 continue
 
             # DEBUG: log the actual text being evaluated
@@ -743,7 +743,7 @@ def evaluate_assignment():
                   f"reference_preview='{reference[:300].replace(chr(10), ' ')}'")
             print(f"[evaluate-assignment] keywords={keywords}")
 
-            sem = semantic_by_pos[i]
+            sem = semantic_by_pos[item_i]
             matched = _keyword_coverage(it["text"], keywords)
             kw_score = len(matched) / len(keywords) if keywords else None
 
@@ -819,10 +819,10 @@ def evaluate_assignment():
             # Character n-gram similarity (char 3-gram + 4-gram Jaccard)
             # This catches paraphrased or differently-worded answers that
             # still share character patterns with the reference.
-            ref_3grams = set(reference[i:i+3] for i in range(len(reference) - 2))
-            ref_4grams = set(reference[i:i+4] for i in range(len(reference) - 3))
-            sub_3grams = set(it["text"][i:i+3] for i in range(len(it["text"]) - 2))
-            sub_4grams = set(it["text"][i:i+4] for i in range(len(it["text"]) - 3))
+            ref_3grams = set(reference[ci:ci+3] for ci in range(max(len(reference) - 2, 0)))
+            ref_4grams = set(reference[ci:ci+4] for ci in range(max(len(reference) - 3, 0)))
+            sub_3grams = set(it["text"][ci:ci+3] for ci in range(max(len(it["text"]) - 2, 0)))
+            sub_4grams = set(it["text"][ci:ci+4] for ci in range(max(len(it["text"]) - 3, 0)))
             jaccard_3 = len(ref_3grams & sub_3grams) / max(len(ref_3grams | sub_3grams), 1)
             jaccard_4 = len(ref_4grams & sub_4grams) / max(len(ref_4grams | sub_4grams), 1)
             char_sim = (jaccard_3 + jaccard_4) / 2.0

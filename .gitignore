@@ -27,3 +27,6 @@ public/write-portal.ps1
 Thumbs.db
 *.log
 __pycache__/
+.venv/
+ml/.venv/
+venv/

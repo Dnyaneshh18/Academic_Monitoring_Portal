@@ -292,8 +292,10 @@ export default function HomeworkPage() {
   }
 
   function isAiSuggested(s: Row) {
+    if (aiResults?.[s.id]) return true;
     if (s.submission?.remark && s.submission.remark.trim().startsWith("Auto-evaluated")) return true;
     if (s.submission?.ai_remark && s.submission.ai_remark.trim().startsWith("Auto-evaluated")) return true;
+    if (s.submission?.ai_obtained !== null && s.submission?.ai_obtained !== undefined) return true;
     return false;
   }
 
@@ -464,7 +466,13 @@ export default function HomeworkPage() {
                   ) : null}
                 </div>
                 <span className={`badge ${t.submission_id ? "bg-brand-100 text-brand-800" : "badge badge-warning"}`}>
-                  {t.submission_id ? (t.verified ? `Verified · ${t.obtained}/${t.max_marks}` : (t.ai_obtained !== null && t.ai_obtained !== undefined ? `AI estimate: ${t.ai_obtained}/${t.max_marks}` : "Submitted")) : "Not submitted"}
+                  {t.submission_id
+  ? (t.verified && (t.obtained !== null && t.obtained !== undefined && !(t.obtained === 0 && (t.ai_obtained ?? 0) > 0))
+      ? `Verified · ${t.obtained}/${t.max_marks}`
+      : (t.ai_obtained !== null && t.ai_obtained !== undefined
+          ? `AI estimate: ${t.ai_obtained}/${t.max_marks}`
+          : (t.verified ? `Verified · ${t.obtained ?? 0}/${t.max_marks}` : "Submitted")))
+  : "Not submitted"}
                 </span>
               </div>
               {t.submission_id && t.ai_obtained !== null && t.ai_obtained !== undefined ? (
@@ -747,10 +755,15 @@ export default function HomeworkPage() {
                       {s.submission ? (
                         <span className="flex items-center gap-2">
                           <input
-                            key={`${s.id}-${s.submission.obtained ?? s.submission.ai_obtained ?? ""}`}
+                            key={`${s.id}-${aiResults?.[s.id]?.obtained ?? (s.submission.obtained !== null && s.submission.obtained !== undefined && !(s.submission.obtained === 0 && (s.submission.ai_obtained ?? 0) > 0) ? s.submission.obtained : s.submission.ai_obtained ?? s.submission.obtained ?? "")}`}
                             className={`field max-w-[80px] ${isAiSuggested(s) ? "border-brand-400 bg-brand-50" : ""}`}
                             type="number"
-                            defaultValue={s.submission.obtained ?? s.submission.ai_obtained ?? ""}
+                            defaultValue={
+                              aiResults?.[s.id]?.obtained ??
+                              (s.submission.obtained !== null && s.submission.obtained !== undefined && !(s.submission.obtained === 0 && (s.submission.ai_obtained ?? 0) > 0)
+                                ? s.submission.obtained
+                                : s.submission.ai_obtained ?? s.submission.obtained ?? "")
+                            }
                             onBlur={(e) => {
                               const v = e.target.value;
                               if (v !== "") mark(s.id, Number(v));

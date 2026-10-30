@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { ensureDb, all, one, run } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
+import { flushPgWrites } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +68,7 @@ async function extractSubmissionText(row: SubmissionRow): Promise<{ text: string
     return { text: buffer.toString("utf8").trim() };
   }
   if (buffer && (ext === ".docx" || ext === ".doc")) {
+    // Send raw bytes to ML service for python-docx extraction.
     return { text: "", docx_base64: buffer.toString("base64") };
   }
   return { text: "" };
@@ -175,6 +177,11 @@ export async function POST(req: NextRequest) {
         [target]
       );
       console.log(`[auto-grade] SAVED: submission=${target} student=${r.student_id} obtained=${saved?.obtained} ai_obtained=${saved?.ai_obtained} verified=${saved?.verified}`);
+    }
+    try {
+      await flushPgWrites();
+    } catch (e) {
+      console.error("[auto-grade] flush error:", e);
     }
   }
 

@@ -3,7 +3,7 @@ import { ensureDb, all, one, run } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
 import { facultyOwnsSubject, listStudents } from "@/lib/queries";
 import { uid } from "@/lib/ids";
-import { syncHomeworkFromPostgres } from "@/lib/postgres";
+import { syncHomeworkFromPostgres, flushPgWrites } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -185,6 +185,11 @@ export async function POST(req: NextRequest) {
       body.remark || null,
       sub.id
     ]);
+    try {
+      await flushPgWrites();
+    } catch (e) {
+      console.error("[homework mark] flush error:", e);
+    }
     return json({ ok: true });
   }
 

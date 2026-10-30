@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ensureDb, one, run } from "@/lib/db";
 import { isResponse, json, requireUser } from "@/lib/api";
+import { flushPgWrites } from "@/lib/postgres";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,7 +124,8 @@ export async function POST(req: NextRequest) {
     if (!r) return json({ error: "ML service returned no results" }, 502);
     run(
       `UPDATE homework_submissions
-       SET ai_obtained = ?, ai_semantic_score = ?, ai_keyword_score = ?, ai_completeness_score = ?, ai_plagiarism_score = ?, ai_matched_keywords = ?, ai_remark = ?, ai_evaluated_at = datetime('now')
+       SET ai_obtained = ?, ai_semantic_score = ?, ai_keyword_score = ?, ai_completeness_score = ?, ai_plagiarism_score = ?, ai_matched_keywords = ?, ai_remark = ?, ai_evaluated_at = datetime('now'),
+           obtained = ?, remark = ?, verified = 1
        WHERE id = ?`,
       [
         r.obtained ?? 0,
@@ -133,9 +135,16 @@ export async function POST(req: NextRequest) {
         r.plagiarism_score ?? 0,
         JSON.stringify(r.matched_keywords || []),
         r.remark ?? "",
+        r.obtained ?? 0,
+        r.remark ?? "",
         sub.id
       ]
     );
+    try {
+      await flushPgWrites();
+    } catch (e) {
+      console.error("[evaluate] flush error:", e);
+    }
     return json({ ok: true, ai: r });
   } catch (e) {
     return json({ error: `ML service unreachable: ${(e as Error).message}` }, 502);
