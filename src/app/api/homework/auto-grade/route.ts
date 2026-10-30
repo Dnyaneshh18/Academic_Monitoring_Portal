@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
         "SELECT obtained, ai_obtained, verified FROM homework_submissions WHERE id = ?",
         [target]
       );
-      console.log(`[auto-grade] SAVED: submission=${target} student=${r.student_id} ` +\n        `obtained=${saved?.obtained} ai_obtained=${saved?.ai_obtained} verified=${saved?.verified}`);
+      console.log(`[auto-grade] SAVED: submission=${target} student=${r.student_id} obtained=${saved?.obtained} ai_obtained=${saved?.ai_obtained} verified=${saved?.verified}`);
     }
   }
 
