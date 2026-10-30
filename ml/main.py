@@ -32,6 +32,11 @@ try:  # pypdf is optional at import time — PDF text extraction degrades gracef
 except Exception:  # noqa: BLE001
     PdfReader = None
 
+try:  # python-docx is optional — Word document text extraction degrades gracefully
+    from docx import Document as DocxDocument
+except Exception:  # noqa: BLE001
+    DocxDocument = None
+
 try:  # sentence-transformers is optional — the service falls back to TF-IDF
     from sentence_transformers import SentenceTransformer
 except Exception:  # noqa: BLE001
@@ -227,6 +232,15 @@ def extract_text_from_pdf(data) -> str:
         except Exception:  # noqa: BLE001 — skip unreadable pages
             parts.append("")
     return "\n".join(parts).strip()
+
+
+def extract_text_from_docx(data) -> str:
+    """Extract text from DOCX bytes using python-docx."""
+    if DocxDocument is None:
+        raise RuntimeError("python-docx is not installed")
+    doc = DocxDocument(io.BytesIO(data))
+    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+    return "\n".join(paragraphs).strip()
 
 
 def _extract_keywords(text: str, limit: int = 8):
@@ -656,6 +670,11 @@ def evaluate_assignment():
                     text = extract_text_from_pdf(base64.b64decode(s["pdf_base64"]))
                 except Exception:  # noqa: BLE001 — unreadable PDF → empty text
                     text = ""
+            if not text and s.get("docx_base64"):
+                try:
+                    text = extract_text_from_docx(base64.b64decode(s["docx_base64"]))
+                except Exception:  # noqa: BLE001 — unreadable DOCX → empty text
+                    text = ""
             items.append({
                 "student_id": sid,
                 "submission_id": str(s.get("submission_id") or "") or None,
@@ -681,16 +700,39 @@ def evaluate_assignment():
         for i, it in enumerate(items):
             sid = it["student_id"]
             if not it["text"]:
-                results.append({
-                    "student_id": sid,
-                    "obtained": 0.0,
-                    "semantic_score": 0.0,
-                    "keyword_score": 0.0,
-                    "completeness_score": 0.0,
-                    "plagiarism_score": 0.0,
-                    "matched_keywords": [],
-                    "remark": "Auto-evaluated: No readable text found in submission."
-                })
+                # Non-text submission (Word without python-docx, PPT, image, ZIP).
+                # Give an effort-based score based on file size instead of hard 0.
+                file_size = it.get("size")
+                effort = 0.0
+                if file_size and float(file_size) > 0:
+                    size_kb = float(file_size) / 1024.0
+                    effort = max(0.10, min(0.40, size_kb / 1250.0 + 0.10))  # 10–40% based on size
+                if effort > 0:
+                    effort_obtained = round(effort * max_marks, 1)
+                    result = {
+                        "student_id": sid,
+                        "obtained": effort_obtained,
+                        "semantic_score": 0.0,
+                        "keyword_score": 0.0,
+                        "completeness_score": 0.0,
+                        "plagiarism_score": 1.0,
+                        "matched_keywords": [],
+                        "remark": f"Auto-evaluated: Text not extractable (Word/PPT/image). Effort score: {effort_obtained}/{max_marks}. Faculty review recommended."
+                    }
+                else:
+                    result = {
+                        "student_id": sid,
+                        "obtained": 0.0,
+                        "semantic_score": 0.0,
+                        "keyword_score": 0.0,
+                        "completeness_score": 0.0,
+                        "plagiarism_score": 0.0,
+                        "matched_keywords": [],
+                        "remark": "Auto-evaluated: No readable text found in submission."
+                    }
+                if it.get("submission_id"):
+                    result["submission_id"] = it["submission_id"]
+                results.append(result)
                 continue
 
             # DEBUG: log the actual text being evaluated

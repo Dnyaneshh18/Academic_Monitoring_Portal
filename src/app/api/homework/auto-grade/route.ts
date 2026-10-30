@@ -40,7 +40,7 @@ function parseKeywords(raw: string | null | undefined): string[] {
 }
 
 /** Extract readable text from a submission (PDF via pdf-parse, TXT as utf8). */
-async function extractSubmissionText(row: SubmissionRow): Promise<{ text: string; pdf_base64?: string }> {
+async function extractSubmissionText(row: SubmissionRow): Promise<{ text: string; pdf_base64?: string; docx_base64?: string }> {
   const ext = path.extname(row.file_name || "").toLowerCase();
   let buffer: Buffer | null = null;
   if (row.file_data) buffer = blobToBuffer(row.file_data);
@@ -65,6 +65,9 @@ async function extractSubmissionText(row: SubmissionRow): Promise<{ text: string
   }
   if (buffer && ext === ".txt") {
     return { text: buffer.toString("utf8").trim() };
+  }
+  if (buffer && (ext === ".docx" || ext === ".doc")) {
+    return { text: "", docx_base64: buffer.toString("base64") };
   }
   return { text: "" };
 }
@@ -108,7 +111,8 @@ export async function POST(req: NextRequest) {
       submission_id: sub.id,
       text: extracted.text,
       size: sub.size,
-      ...(extracted.pdf_base64 ? { pdf_base64: extracted.pdf_base64 } : {})
+      ...(extracted.pdf_base64 ? { pdf_base64: extracted.pdf_base64 } : {}),
+      ...(extracted.docx_base64 ? { docx_base64: extracted.docx_base64 } : {})
     });
   }
 
