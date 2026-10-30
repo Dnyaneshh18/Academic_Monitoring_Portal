@@ -16,6 +16,7 @@ import base64
 import io
 import os
 import re
+from collections import Counter
 from decimal import Decimal, ROUND_HALF_UP
 
 import numpy as np
@@ -255,6 +256,80 @@ def _keyword_coverage(text: str, keywords):
     return matched
 
 
+
+def _build_reference(title, instructions, model_answer, keywords):
+    """Build a rich reference text from ALL available assignment fields.
+
+    Combines title, instructions, model answer, and keywords so the
+    TF-IDF / semantic engine has enough context to produce meaningful
+    similarity scores even when only the title is available.
+    """
+    parts = []
+    if title and str(title).strip():
+        parts.append(str(title).strip())
+    if instructions and str(instructions).strip():
+        parts.append(str(instructions).strip())
+    if model_answer and str(model_answer).strip():
+        parts.append(str(model_answer).strip())
+    if keywords:
+        kw_text = " ".join(str(k).strip() for k in keywords if str(k).strip())
+        if kw_text:
+            parts.append(kw_text)
+    return "\n".join(parts).strip()
+
+
+def _plagiarism_check(text, reference):
+    """Simple plagiarism detection (0.0 = heavy copying, 1.0 = original).
+
+    Checks for:
+    - Self-repetition: same sentence appearing multiple times
+    - Excessive copying: >50% of sentences are exact matches in reference
+    - Suspiciously high n-gram overlap with reference
+    """
+    if not text or not text.strip():
+        return 0.0
+
+    sentences = [s.strip() for s in re.split(r'[.!?]+', text) if len(s.strip()) > 10]
+    if len(sentences) < 2:
+        # Very short text — can't assess plagiarism, give neutral score
+        return 0.6
+
+    # Self-repetition: count duplicate sentences
+    sent_counts = Counter(s.lower() for s in sentences)
+    repeated_count = sum(c - 1 for c in sent_counts.values() if c > 1)
+    self_repeat_ratio = repeated_count / len(sentences)
+
+    # Exact sentence matches with reference
+    ref_lower = reference.lower() if reference else ""
+    exact_matches = sum(1 for s in sentences if s.lower() in ref_lower)
+    copy_ratio = exact_matches / len(sentences)
+
+    # 3-gram overlap: how many 3-word sequences from student text appear in reference
+    ref_words = ref_lower.split()
+    ref_ngrams = set()
+    for i in range(len(ref_words) - 2):
+        ref_ngrams.add(" ".join(ref_words[i:i+3]))
+
+    text_words = text.lower().split()
+    text_ngrams = []
+    for i in range(len(text_words) - 2):
+        text_ngrams.append(" ".join(text_words[i:i+3]))
+
+    if text_ngrams:
+        ngram_overlap = sum(1 for ng in text_ngrams if ng in ref_ngrams) / len(text_ngrams)
+    else:
+        ngram_overlap = 0.0
+
+    # Score: penalize self-repetition, excessive copying, and high n-gram overlap
+    # 1.0 = fully original, 0.0 = heavily copied
+    score = 1.0
+    score -= self_repeat_ratio * 0.4       # self-repetition penalty
+    score -= copy_ratio * 0.3              # exact copy penalty
+    score -= max(0.0, ngram_overlap - 0.3) * 0.3  # n-gram overlap penalty (only above 30%)
+
+    return max(0.0, min(1.0, score))
+
+
 def _semantic_scores(reference: str, submission_texts):
     """Cosine similarity between each submission and the reference answer.
 
@@ -484,6 +559,8 @@ def evaluate_assignment():
         if max_marks <= 0:
             return jsonify({"error": "max_marks must be greater than 0"}), 400
 
+        title = str(data.get("title") or "").strip()
+        instructions = str(data.get("instructions") or "").strip()
         model_answer = str(data.get("model_answer") or "").strip()
         keywords_raw = data.get("keywords") or []
         if not isinstance(keywords_raw, list):
@@ -494,10 +571,11 @@ def evaluate_assignment():
         if not isinstance(submissions, list):
             return jsonify({"error": "'submissions' must be a list"}), 400
 
-        if not model_answer and not keywords:
-            return jsonify({"error": "Provide a model answer or keyword list to evaluate against"}), 400
+        # Build a rich reference from ALL available assignment fields
+        reference = _build_reference(title, instructions, model_answer, keywords)
+        if not reference:
+            return jsonify({"error": "Provide a title, instructions, model answer, or keywords to evaluate against"}), 400
 
-        reference = model_answer or " ".join(keywords)
         keywords = keywords or _extract_keywords(reference)
 
         # Resolve each submission to text (extract PDF text when needed).
@@ -551,12 +629,18 @@ def evaluate_assignment():
             matched = _keyword_coverage(it["text"], keywords)
             kw_score = len(matched) / len(keywords) if keywords else None
             completeness = min(len(it["text"]) / max(len(reference), 1), 1.0)
+            plagiarism_score = _plagiarism_check(it["text"], reference)
 
+            # Scoring weights:
+            #   semantic    : 45% — how well the answer aligns with the assignment
+            #   keyword     : 25% — coverage of key concepts
+            #   completeness: 20% — length relative to reference
+            #   plagiarism  : 10% — originality (penalises copying)
             if kw_score is None:
-                # No keywords: redistribute the weights over the remaining parts.
-                combined = (sem * 0.60 + completeness * 0.10) / 0.70
+                # No keywords: redistribute weight across semantic, completeness, plagiarism
+                combined = (sem * 0.55 + completeness * 0.35 + plagiarism_score * 0.10) / 1.0
             else:
-                combined = sem * 0.60 + kw_score * 0.30 + completeness * 0.10
+                combined = sem * 0.45 + kw_score * 0.25 + completeness * 0.20 + plagiarism_score * 0.10
 
             combined = max(0.0, min(1.0, combined))
             match_pct = _r1(combined * 100.0)
@@ -575,14 +659,21 @@ def evaluate_assignment():
                 else ""
             )
 
+            plag_note = ""
+            if plagiarism_score < 0.4:
+                plag_note = " ⚠ Possible plagiarism detected."
+            elif plagiarism_score < 0.7:
+                plag_note = " (Some copied content detected.)"
+
             result = {
                 "student_id": sid,
                 "obtained": obtained,
                 "semantic_score": _r3(sem),
                 "keyword_score": _r3(kw_score if kw_score is not None else 0.0),
                 "completeness_score": _r3(completeness),
+                "plagiarism_score": _r3(plagiarism_score),
                 "matched_keywords": matched,
-                "remark": f"Auto-evaluated: {match_pct}% match. {note}{kw_note}",
+                "remark": f"Auto-evaluated: {match_pct}% match. {note}{kw_note}{plag_note}",
             }
             if it.get("submission_id"):
                 result["submission_id"] = it["submission_id"]

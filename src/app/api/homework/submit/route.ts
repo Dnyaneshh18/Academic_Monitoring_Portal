@@ -32,6 +32,7 @@ type AiEvalResult = {
   semantic_score: number;
   keyword_score: number;
   completeness_score: number;
+  plagiarism_score: number;
   matched_keywords: string[];
   remark: string;
 };
@@ -125,8 +126,8 @@ export async function POST(req: NextRequest) {
   let ai: AiEvalResult | null = null;
   let aiError: string | null = null;
   if (subRow) {
-    const meta = one<{ model_answer: string | null; keywords: string | null; max_marks: number; title: string }>(
-      "SELECT model_answer, keywords, max_marks, title FROM homework_tasks WHERE id = ?",
+    const meta = one<{ model_answer: string | null; instructions: string | null; keywords: string | null; max_marks: number; title: string }>(
+      "SELECT model_answer, instructions, keywords, max_marks, title FROM homework_tasks WHERE id = ?",
       [taskId]
     );
     const modelAnswer = (meta?.model_answer || meta?.title || "").trim();
@@ -143,6 +144,8 @@ export async function POST(req: NextRequest) {
     if (modelAnswer || keywords.length) {
       let text = await extractTextFromBuffer(fileData, safe);
       let payload: Record<string, unknown> = {
+        title: meta?.title || "",
+        instructions: meta?.instructions || "",
         model_answer: modelAnswer,
         keywords,
         max_marks: meta?.max_marks ?? 10,
@@ -168,13 +171,14 @@ export async function POST(req: NextRequest) {
             ai = r;
             run(
               `UPDATE homework_submissions
-               SET ai_obtained = ?, ai_semantic_score = ?, ai_keyword_score = ?, ai_completeness_score = ?, ai_matched_keywords = ?, ai_remark = ?, ai_evaluated_at = datetime('now')
+               SET ai_obtained = ?, ai_semantic_score = ?, ai_keyword_score = ?, ai_completeness_score = ?, ai_plagiarism_score = ?, ai_matched_keywords = ?, ai_remark = ?, ai_evaluated_at = datetime('now')
                WHERE id = ?`,
               [
                 r.obtained,
                 r.semantic_score,
                 r.keyword_score,
                 r.completeness_score,
+                r.plagiarism_score,
                 JSON.stringify(r.matched_keywords || []),
                 r.remark,
                 subRow.id

@@ -60,6 +60,7 @@ export function getDb(): DatabaseSync {
     }
     try {
       globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_completeness_score REAL");
+      globalForDb.ampDb.exec("ALTER TABLE homework_submissions ADD COLUMN ai_plagiarism_score REAL");
     } catch {
       /* exists */
     }

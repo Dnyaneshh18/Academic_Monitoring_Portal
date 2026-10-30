@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     resp = await fetch(`${ML_SERVICE_URL}/evaluate-assignment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ max_marks: task.max_marks, model_answer: modelAnswer, keywords, submissions: items })
+      body: JSON.stringify({ max_marks: task.max_marks, title: task.title, instructions: task.instructions, model_answer: modelAnswer, keywords, submissions: items })
     });
   } catch (e) {
     return json({ error: `ML service unreachable: ${(e as Error).message}` }, 502);
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = (await resp.json().catch(() => ({}))) as {
-    results?: { student_id: string; submission_id?: string; obtained: number; semantic_score: number; keyword_score: number; completeness_score: number; matched_keywords: string[]; remark: string }[];
+    results?: { student_id: string; submission_id?: string; obtained: number; semantic_score: number; keyword_score: number; completeness_score: number; plagiarism_score: number; matched_keywords: string[]; remark: string }[];
     error?: string;
   };
   const results = payload.results || [];
@@ -143,9 +143,10 @@ export async function POST(req: NextRequest) {
           r.student_id
         ])?.id;
       if (!target) continue;
-      run("UPDATE homework_submissions SET obtained = ?, remark = ?, verified = 1 WHERE id = ?", [
+      run("UPDATE homework_submissions SET obtained = ?, remark = ?, ai_plagiarism_score = ?, verified = 1 WHERE id = ?", [
         r.obtained,
         r.remark,
+        r.plagiarism_score,
         target
       ]);
     }
