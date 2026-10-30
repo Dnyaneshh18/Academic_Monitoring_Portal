@@ -364,6 +364,7 @@ CREATE TABLE IF NOT EXISTS homework_submissions (
   ai_semantic_score DOUBLE PRECISION,
   ai_keyword_score DOUBLE PRECISION,
   ai_completeness_score DOUBLE PRECISION,
+  ai_plagiarism_score DOUBLE PRECISION,
   ai_matched_keywords TEXT,
   ai_remark TEXT,
   ai_evaluated_at TEXT,

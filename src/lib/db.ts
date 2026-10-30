@@ -176,6 +176,7 @@ async function syncPostgres(db: DatabaseSync) {
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_semantic_score DOUBLE PRECISION");
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_keyword_score DOUBLE PRECISION");
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_completeness_score DOUBLE PRECISION");
+      await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_plagiarism_score DOUBLE PRECISION");
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_matched_keywords TEXT");
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_remark TEXT");
       await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS ai_evaluated_at TEXT");

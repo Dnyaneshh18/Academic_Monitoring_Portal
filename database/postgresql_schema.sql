@@ -198,12 +198,21 @@ CREATE TABLE IF NOT EXISTS homework_submissions (
   student_id TEXT NOT NULL,
   file_name TEXT NOT NULL,
   stored_path TEXT NOT NULL,
+  file_data BYTEA,
   mime TEXT,
   size INTEGER,
   submitted_at TEXT DEFAULT (NOW()::text),
   verified INTEGER DEFAULT 0,
   obtained DOUBLE PRECISION,
   remark TEXT,
+  ai_obtained DOUBLE PRECISION,
+  ai_semantic_score DOUBLE PRECISION,
+  ai_keyword_score DOUBLE PRECISION,
+  ai_completeness_score DOUBLE PRECISION,
+  ai_plagiarism_score DOUBLE PRECISION,
+  ai_matched_keywords TEXT,
+  ai_remark TEXT,
+  ai_evaluated_at TEXT,
   UNIQUE (task_id, student_id)
 );
 CREATE TABLE IF NOT EXISTS ml_scores (
