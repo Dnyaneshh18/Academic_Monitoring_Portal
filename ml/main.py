@@ -279,12 +279,16 @@ def _build_reference(title, instructions, model_answer, keywords):
 
 
 def _plagiarism_check(text, reference):
-    """Simple plagiarism detection (0.0 = heavy copying, 1.0 = original).
+    """Plagiarism detection (0.0 = heavy copying, 1.0 = fully original).
 
-    Checks for:
+    Only penalizes:
     - Self-repetition: same sentence appearing multiple times
-    - Excessive copying: >50% of sentences are exact matches in reference
-    - Suspiciously high n-gram overlap with reference
+    - Verbatim copying: >50% of sentences are exact matches in reference
+    - Long identical n-grams (5+ words) copied from reference
+
+    Does NOT penalize:
+    - Using similar terminology (expected for correct answers)
+    - Short phrase overlap (3-4 words)
     """
     if not text or not text.strip():
         return 0.0
@@ -292,40 +296,42 @@ def _plagiarism_check(text, reference):
     sentences = [s.strip() for s in re.split(r'[.!?]+', text) if len(s.strip()) > 10]
     if len(sentences) < 2:
         # Very short text — can't assess plagiarism, give neutral score
-        return 0.6
+        return 0.7
 
     # Self-repetition: count duplicate sentences
     sent_counts = Counter(s.lower() for s in sentences)
     repeated_count = sum(c - 1 for c in sent_counts.values() if c > 1)
     self_repeat_ratio = repeated_count / len(sentences)
 
-    # Exact sentence matches with reference
+    # Exact sentence matches with reference (verbatim copying)
     ref_lower = reference.lower() if reference else ""
-    exact_matches = sum(1 for s in sentences if s.lower() in ref_lower)
+    # Normalize whitespace for fair comparison
+    ref_norm = re.sub(r'\s+', ' ', ref_lower).strip()
+    exact_matches = sum(1 for s in sentences if re.sub(r'\s+', ' ', s.lower()).strip() in ref_norm)
     copy_ratio = exact_matches / len(sentences)
 
-    # 3-gram overlap: how many 3-word sequences from student text appear in reference
-    ref_words = ref_lower.split()
+    # Long n-gram overlap (5+ words) — only flags actual copying, not terminology
+    ref_words = ref_norm.split()
     ref_ngrams = set()
-    for i in range(len(ref_words) - 2):
-        ref_ngrams.add(" ".join(ref_words[i:i+3]))
+    for i in range(len(ref_words) - 4):
+        ref_ngrams.add(" ".join(ref_words[i:i+5]))
 
-    text_words = text.lower().split()
+    text_words = re.sub(r'\s+', ' ', text.lower()).split()
     text_ngrams = []
-    for i in range(len(text_words) - 2):
-        text_ngrams.append(" ".join(text_words[i:i+3]))
+    for i in range(len(text_words) - 4):
+        text_ngrams.append(" ".join(text_words[i:i+5]))
 
     if text_ngrams:
-        ngram_overlap = sum(1 for ng in text_ngrams if ng in ref_ngrams) / len(text_ngrams)
+        long_ngram_overlap = sum(1 for ng in text_ngrams if ng in ref_ngrams) / len(text_ngrams)
     else:
-        ngram_overlap = 0.0
+        long_ngram_overlap = 0.0
 
-    # Score: penalize self-repetition, excessive copying, and high n-gram overlap
+    # Score: penalize self-repetition and verbatim copying
     # 1.0 = fully original, 0.0 = heavily copied
     score = 1.0
-    score -= self_repeat_ratio * 0.4       # self-repetition penalty
-    score -= copy_ratio * 0.3              # exact copy penalty
-    score -= max(0.0, ngram_overlap - 0.3) * 0.3  # n-gram overlap penalty (only above 30%)
+    score -= self_repeat_ratio * 0.3       # self-repetition penalty
+    score -= copy_ratio * 0.5              # verbatim copy penalty (heavily weighted)
+    score -= max(0.0, long_ngram_overlap - 0.2) * 0.5  # long n-gram overlap (only above 20%)
 
     return max(0.0, min(1.0, score))
 
@@ -335,6 +341,7 @@ def _semantic_scores(reference: str, submission_texts):
 
     Engine 1: SentenceTransformer('all-MiniLM-L6-v2') embeddings.
     Engine 2 (fallback): TF-IDF vectorizer + cosine similarity.
+    Engine 3 (fallback): Word overlap ratio.
     """
     model = _get_st_model()
     if model is not None:
@@ -347,13 +354,33 @@ def _semantic_scores(reference: str, submission_texts):
             return sims
         except Exception as e:  # noqa: BLE001 — half-initialized model → fall back
             print("[evaluate-assignment] SentenceTransformer encoding failed — using TF-IDF fallback:", e)
+
+    # TF-IDF — do NOT use stop_words="english" (removes technical terms)
     corpus = [reference] + submission_texts
     try:
-        tf = TfidfVectorizer(lowercase=True, stop_words="english").fit_transform(corpus)
+        tf = TfidfVectorizer(lowercase=True, token_pattern=r"(?u)\b\w[\w\-']+\b").fit_transform(corpus)
+        sims = cosine_similarity(tf[0:1], tf[1:]).flatten()
     except ValueError:  # empty vocabulary
-        return [0.0] * len(submission_texts)
-    sims = cosine_similarity(tf[0:1], tf[1:]).flatten()
-    return [max(0.0, min(1.0, float(s))) for s in sims]
+        sims = [0.0] * len(submission_texts)
+
+    # TF-IDF cosine is naturally low for short texts — blend with word overlap
+    result = []
+    for i, s in enumerate(sims):
+        s = max(0.0, min(1.0, float(s)))
+        # Word overlap: fraction of reference words found in submission
+        ref_words = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", reference.lower()))
+        sub_words = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", submission_texts[i].lower()))
+        if ref_words:
+            overlap = len(ref_words & sub_words) / len(ref_words)
+        else:
+            overlap = 0.0
+        # Blend: 60% TF-IDF, 40% word overlap — both should agree for good answers
+        blended = s * 0.6 + overlap * 0.4
+        # If TF-IDF is very low but word overlap is decent, trust the overlap more
+        if s < 0.1 and overlap > 0.2:
+            blended = overlap * 0.7
+        result.append(max(0.0, min(1.0, blended)))
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -628,21 +655,47 @@ def evaluate_assignment():
             sem = semantic_by_pos[i]
             matched = _keyword_coverage(it["text"], keywords)
             kw_score = len(matched) / len(keywords) if keywords else None
-            completeness = min(len(it["text"]) / max(len(reference), 1), 1.0)
+
+            # Completeness: blend of length ratio and concept coverage
+            # Length ratio: how much of the reference length the student covered
+            len_ratio = min(len(it["text"]) / max(len(reference), 1), 1.0)
+            # Concept coverage: how many reference concepts the student addressed
+            ref_words = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", reference.lower()))
+            sub_words = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", it["text"].lower()))
+            concept_cov = len(ref_words & sub_words) / max(len(ref_words), 1) if ref_words else 0.0
+            # Blend: 50% length, 50% concept coverage
+            completeness = len_ratio * 0.5 + concept_cov * 0.5
+
             plagiarism_score = _plagiarism_check(it["text"], reference)
 
-            # Scoring weights:
-            #   semantic    : 45% — how well the answer aligns with the assignment
+            # Scoring weights (revised for fairness):
+            #   semantic    : 40% — how well the answer aligns with the assignment
             #   keyword     : 25% — coverage of key concepts
-            #   completeness: 20% — length relative to reference
+            #   completeness: 25% — concept coverage and adequate depth
             #   plagiarism  : 10% — originality (penalises copying)
             if kw_score is None:
                 # No keywords: redistribute weight across semantic, completeness, plagiarism
-                combined = (sem * 0.55 + completeness * 0.35 + plagiarism_score * 0.10) / 1.0
+                combined = sem * 0.60 + completeness * 0.30 + plagiarism_score * 0.10
             else:
-                combined = sem * 0.45 + kw_score * 0.25 + completeness * 0.20 + plagiarism_score * 0.10
+                combined = sem * 0.40 + kw_score * 0.25 + completeness * 0.25 + plagiarism_score * 0.10
 
             combined = max(0.0, min(1.0, combined))
+
+            # Minimum score floor: if the student wrote readable text and has
+            # ANY keyword match or word overlap, they deserve at least some marks.
+            min_floor = 0.0
+            if matched:
+                # Matched at least one keyword → floor based on coverage
+                min_floor = max(min_floor, (len(matched) / max(len(keywords), 1)) * 0.5)
+            # Word overlap with reference
+            ref_word_set = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", reference.lower()))
+            sub_word_set = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", it["text"].lower()))
+            if ref_word_set:
+                overlap_ratio = len(ref_word_set & sub_word_set) / len(ref_word_set)
+                if overlap_ratio > 0.1:
+                    min_floor = max(min_floor, overlap_ratio * 0.5)
+            combined = max(combined, min_floor)
+
             match_pct = _r1(combined * 100.0)
             obtained = _r1(combined * max_marks)
 
