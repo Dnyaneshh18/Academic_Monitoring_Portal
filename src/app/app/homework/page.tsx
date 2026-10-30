@@ -292,7 +292,9 @@ export default function HomeworkPage() {
   }
 
   function isAiSuggested(s: Row) {
-    return (s.submission?.remark || "").trim().startsWith("Auto-evaluated");
+    if (s.submission?.remark && s.submission.remark.trim().startsWith("Auto-evaluated")) return true;
+    if (s.submission?.ai_remark && s.submission.ai_remark.trim().startsWith("Auto-evaluated")) return true;
+    return false;
   }
 
   function startEdit(task: Task) {
@@ -462,7 +464,7 @@ export default function HomeworkPage() {
                   ) : null}
                 </div>
                 <span className={`badge ${t.submission_id ? "bg-brand-100 text-brand-800" : "badge badge-warning"}`}>
-                  {t.submission_id ? (t.verified ? `Verified · ${t.obtained}/${t.max_marks}` : "Submitted") : "Not submitted"}
+                  {t.submission_id ? (t.verified ? `Verified · ${t.obtained}/${t.max_marks}` : (t.ai_obtained !== null && t.ai_obtained !== undefined ? `AI estimate: ${t.ai_obtained}/${t.max_marks}` : "Submitted")) : "Not submitted"}
                 </span>
               </div>
               {t.submission_id && t.ai_obtained !== null && t.ai_obtained !== undefined ? (
@@ -472,10 +474,10 @@ export default function HomeworkPage() {
                   {t.ai_matched_keywords ? (
                     <p className="mt-0.5 text-ink-600">
                       Keywords matched: {JSON.parse(t.ai_matched_keywords || "[]").join(", ") || "—"}
+                    </p>
+                  ) : null}
                   {t.ai_plagiarism_score !== null && t.ai_plagiarism_score !== undefined ? (
                     <p className="text-[11px] text-ink-500">Originality: {Math.round(t.ai_plagiarism_score * 100)}%</p>
-                  ) : null}
-                    </p>
                   ) : null}
                   {t.ai_evaluated_at ? <p className="text-ink-400">Evaluated at {t.ai_evaluated_at}</p> : null}
                 </div>
@@ -745,10 +747,10 @@ export default function HomeworkPage() {
                       {s.submission ? (
                         <span className="flex items-center gap-2">
                           <input
-                            key={`${s.id}-${s.submission.obtained ?? ""}`}
+                            key={`${s.id}-${s.submission.obtained ?? s.submission.ai_obtained ?? ""}`}
                             className={`field max-w-[80px] ${isAiSuggested(s) ? "border-brand-400 bg-brand-50" : ""}`}
                             type="number"
-                            defaultValue={s.submission.obtained ?? ""}
+                            defaultValue={s.submission.obtained ?? s.submission.ai_obtained ?? ""}
                             onBlur={(e) => {
                               const v = e.target.value;
                               if (v !== "") mark(s.id, Number(v));
