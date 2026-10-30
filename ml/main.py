@@ -732,6 +732,13 @@ def evaluate_assignment():
                 result["submission_id"] = it["submission_id"]
             results.append(result)
 
+        # Debug logging — print every score so the terminal shows what happened
+        for r in results:
+            print(f"[evaluate-assignment] student={r['student_id']} obtained={r['obtained']} "
+                  f"sem={r['semantic_score']} kw={r['keyword_score']} comp={r['completeness_score']} "
+                  f"plag={r['plagiarism_score']} matched={r['matched_keywords']} "
+                  f"remark={r['remark']}")
+
         return jsonify({"results": results})
     except Exception as e:  # noqa: BLE001 — report any failure as HTTP 500
         return jsonify({"error": str(e)}), 500
