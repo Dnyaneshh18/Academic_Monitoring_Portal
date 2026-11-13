@@ -646,28 +646,31 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
         return None
     try:
         prompt = (
-            f"You are a strict, fair university professor evaluating a student's submission.\n"
+            f"You are an objective academic professor evaluating a student's coursework/lab submission.\n"
             f"ASSIGNMENT TITLE: {title}\n"
         )
         if instructions:
-            prompt += f"INSTRUCTIONS: {instructions}\n"
+            prompt += f"INSTRUCTIONS / REQUIREMENTS: {instructions}\n"
         if model_answer:
             prompt += f"MODEL ANSWER / RUBRIC: {model_answer}\n"
         if keywords:
-            prompt += f"REQUIRED CONCEPTS: {', '.join(keywords)}\n"
+            prompt += f"KEY TOPICS / CONCEPTS: {', '.join(keywords)}\n"
         prompt += f"MAX MARKS: {max_marks}\n\n"
         prompt += (
             f"STUDENT SUBMISSION:\n```\n{student_text[:5000]}\n```\n\n"
-            f"Evaluate the submission carefully:\n"
-            f"1. Check if the code or explanation genuinely answers the assignment question and satisfies instructions.\n"
-            f"2. Award marks up to {max_marks} based on correctness, logic, syntax, algorithms, and completeness.\n"
-            f"3. Deduct marks for missing requirements, bugs, or incomplete answers.\n"
+            f"GRADING GUIDELINES:\n"
+            f"1. Objectively evaluate the student's submission against the assignment instructions.\n"
+            f"2. Check if the code or answer correctly implements the required algorithms or topics.\n"
+            f"3. If the code or solution is correct, functional, and satisfies the required implementation, award full marks ({max_marks}/{max_marks}).\n"
+            f"4. CRITICAL: DO NOT invent or hallucinate non-existent defects or vague complaints (do NOT say 'minor issues with comments', 'minor issues with edge cases', or 'minor issues with code' when the code is fully valid and working).\n"
+            f"5. If deducting marks, state specifically what required topic or algorithm is missing or broken. If all required tasks are satisfied, award full marks.\n"
+            f"6. In 'remark', provide a direct, professional, factual statement confirming what was achieved.\n\n"
             f"Respond ONLY with a valid JSON object matching this schema:\n"
             f"{{\n"
             f'  "obtained": <number between 0 and {max_marks}>,\n'
             f'  "semantic_score": <number between 0.0 and 1.0>,\n'
-            f'  "matched_keywords": [<list of matched key concepts found>],\n'
-            f'  "remark": "<1-2 sentence concise academic remark explaining why this mark was awarded>"\n'
+            f'  "matched_keywords": [<list of matched key concepts found in submission>],\n'
+            f'  "remark": "<clear, factual remark stating what was achieved>"\n'
             f"}}"
         )
 
@@ -679,7 +682,7 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
                 "format": "json",
                 "stream": False,
                 "options": {
-                    "temperature": 0.1
+                    "temperature": 0.0
                 }
             }).encode("utf-8"),
             headers={"Content-Type": "application/json"}
@@ -839,6 +842,10 @@ def evaluate_assignment():
             if ollama_res is not None:
                 obtained_val = min(max_marks, max(0.0, float(ollama_res.get("obtained", 0.0))))
                 remark_val = str(ollama_res.get("remark", "")).strip()
+                if remark_val.lower().startswith("auto-evaluated"):
+                    final_remark = remark_val
+                else:
+                    final_remark = f"Auto-evaluated (LLM): {remark_val}"
                 result = {
                     "student_id": sid,
                     "obtained": _r1(obtained_val),
@@ -847,7 +854,7 @@ def evaluate_assignment():
                     "completeness_score": _r3(float(ollama_res.get("completeness_score", 1.0))),
                     "plagiarism_score": _r3(float(ollama_res.get("plagiarism_score", 1.0))),
                     "matched_keywords": ollama_res.get("matched_keywords") or matched,
-                    "remark": f"Auto-evaluated (LLM): {remark_val}"
+                    "remark": final_remark
                 }
                 if it.get("submission_id"):
                     result["submission_id"] = it["submission_id"]

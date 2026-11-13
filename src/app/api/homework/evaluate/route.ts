@@ -24,8 +24,10 @@ async function extractTextFromRow(row: {
   file_data: unknown;
   stored_path: string;
   mime: string | null;
-}): Promise<{ text: string; pdf_base64?: string }> {
-  const ext = (row.file_name || "").toLowerCase().endsWith(".pdf") || row.mime === "application/pdf";
+}): Promise<{ text: string; pdf_base64?: string; docx_base64?: string }> {
+  const ext = (row.file_name || "").toLowerCase();
+  const isPdf = ext.endsWith(".pdf") || row.mime === "application/pdf";
+  const isDocx = ext.endsWith(".docx") || ext.endsWith(".doc");
   const fs = await import("fs");
   let buffer: Buffer | null = null;
   if (row.file_data) {
@@ -41,7 +43,7 @@ async function extractTextFromRow(row: {
     }
   }
   if (!buffer) return { text: "" };
-  if (ext) {
+  if (isPdf) {
     try {
       const pdfParse = (await import("pdf-parse")).default as (b: Buffer) => Promise<{ text: string }>;
       const parsed = await pdfParse(buffer);
@@ -51,6 +53,9 @@ async function extractTextFromRow(row: {
       /* fall through to base64 retry */
     }
     return { text: "", pdf_base64: buffer.toString("base64") };
+  }
+  if (isDocx) {
+    return { text: "", docx_base64: buffer.toString("base64") };
   }
   const t = buffer.toString("utf8").trim();
   return { text: t };
@@ -81,7 +86,7 @@ export async function POST(req: NextRequest) {
     "SELECT model_answer, instructions, keywords, max_marks, title FROM homework_tasks WHERE id = ?",
     [taskId]
   );
-  const modelAnswer = (meta?.model_answer || meta?.title || "").trim();
+  const modelAnswer = (meta?.model_answer || meta?.instructions || meta?.title || "").trim();
   let keywords: string[] = [];
   if (meta?.keywords) {
     try {
@@ -107,6 +112,8 @@ export async function POST(req: NextRequest) {
   };
   if (!extracted.text && extracted.pdf_base64) {
     payload.submissions = [{ student_id: st.id, submission_id: sub.id, pdf_base64: extracted.pdf_base64 }];
+  } else if (!extracted.text && extracted.docx_base64) {
+    payload.submissions = [{ student_id: st.id, submission_id: sub.id, docx_base64: extracted.docx_base64 }];
   }
 
   try {
