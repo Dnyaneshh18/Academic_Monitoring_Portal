@@ -18,7 +18,9 @@ import urllib.request
 import io
 import os
 import re
+import subprocess
 import sys
+import tempfile
 
 # Ensure UTF-8 output on Windows consoles so Unicode chars never crash the server
 if hasattr(sys.stdout, "reconfigure"):
@@ -636,6 +638,62 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
 
+def _verify_code_syntax(code: str, title: str = "", instructions: str = ""):
+    """Verify code syntax and detect missing/undeclared functions or compilation errors."""
+    if not code or len(code.strip()) < 20:
+        return None
+
+    # 1. C/C++ compiler verification via g++ if available
+    is_cpp = ("#include" in code) or ("int main" in code) or ("using namespace" in code)
+    if is_cpp:
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".cpp", delete=False, mode="w", encoding="utf-8") as f:
+                f.write(code)
+                fname = f.name
+            res = subprocess.run(["g++", "-fsyntax-only", fname], capture_output=True, text=True, timeout=5)
+            try:
+                os.remove(fname)
+            except Exception:
+                pass
+            if res.returncode == 0:
+                return {"status": "SUCCESS", "message": "Code compiles cleanly without any syntax or declaration errors."}
+            else:
+                lines = [line.strip() for line in res.stderr.split("\n") if "error:" in line]
+                concise_err = "; ".join(lines[:3]) if lines else res.stderr.strip()[:200]
+                return {"status": "COMPILATION_ERROR", "message": concise_err}
+        except Exception:
+            pass
+
+    # 2. Python syntax verification via compile()
+    is_py = ("def " in code) or ("import " in code and ":" in code) or ("print(" in code and ";" not in code)
+    if is_py and not is_cpp:
+        try:
+            compile(code, "<student_code>", "exec")
+            return {"status": "SUCCESS", "message": "Python code parsed and compiled successfully without syntax errors."}
+        except SyntaxError as se:
+            return {"status": "COMPILATION_ERROR", "message": f"SyntaxError at line {se.lineno}: {se.msg}"}
+        except Exception:
+            pass
+
+    # 3. Static regex fallback for undeclared calls in main()
+    main_match = re.search(r'\bint\s+main\s*\([^)]*\)\s*\{(.*)\}', code, re.DOTALL)
+    if main_match:
+        c_func_defs = re.findall(
+            r'\b(?:void|int|float|double|bool|auto|char|long|string|std::string|vector<[^>]+>)\s+([a-zA-Z_]\w*)\s*\([^)]*\)\s*\{',
+            code
+        )
+        defined = set(c_func_defs)
+        types = r'(?:int|float|double|bool|char|long|short|auto|string|std::string|vector<[^>]+>)'
+        declared_vars = set(re.findall(rf'{types}\s+([a-zA-Z_]\w*)', main_match.group(1)))
+        raw_calls = set(re.findall(r'\b([a-zA-Z_]\w*)\s*\(', main_match.group(1)))
+        keywords = {'if', 'for', 'while', 'switch', 'catch', 'sizeof', 'typeof', 'return', 'cout', 'cin', 'display', 'printf', 'scanf', 'swap'}
+        missing = [c for c in raw_calls if c not in defined and c not in declared_vars and c not in keywords]
+        if missing:
+            return {"status": "COMPILATION_ERROR", "message": f"Function '{', '.join(missing)}' is called in main() but is missing its definition."}
+
+    return None
+
+
 def _evaluate_with_ollama(student_text: str, title: str, instructions: str, model_answer: str, keywords: list, max_marks: float):
     """Evaluate submission using local Ollama LLM on the basis of question and rubric.
 
@@ -645,6 +703,8 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
     if not student_text or len(student_text.strip()) < 10:
         return None
     try:
+        code_check = _verify_code_syntax(student_text, title, instructions)
+
         prompt = (
             f"You are an objective academic professor evaluating a student's coursework/lab submission.\n"
             f"ASSIGNMENT TITLE: {title}\n"
@@ -656,21 +716,35 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
         if keywords:
             prompt += f"KEY TOPICS / CONCEPTS: {', '.join(keywords)}\n"
         prompt += f"MAX MARKS: {max_marks}\n\n"
+        prompt += f"STUDENT SUBMISSION:\n```\n{student_text[:5000]}\n```\n\n"
+
+        if code_check and code_check["status"] == "COMPILATION_ERROR":
+            prompt += (
+                f"CODE VERIFICATION FINDING:\n"
+                f"Compilation error detected: {code_check['message']}\n\n"
+                f"GRADING INSTRUCTIONS FOR CODE DEFICIENCIES:\n"
+                f"1. The code fails to compile because required code or function definitions are missing (e.g. {code_check['message']}).\n"
+                f"2. DO NOT award full marks. Deduct marks proportionally for the missing/undeclared functions (e.g., if one of the two main sorting algorithms like Quick Sort is missing while Merge Sort and partition logic are working, award approximately 13 to 14 marks out of {max_marks}).\n"
+                f"3. In 'remark': State clearly what was implemented (e.g. Merge Sort and partition logic) and explicitly mention what was missing or caused the compilation error (e.g. 'quickSort function is not defined, causing compilation error; deducted 6 marks').\n\n"
+            )
+        else:
+            prompt += (
+                f"GRADING GUIDELINES:\n"
+                f"1. Objectively evaluate the student's submission against the assignment instructions.\n"
+                f"2. Check if the code or answer correctly implements the required algorithms or topics.\n"
+                f"3. If the code or solution is correct, functional, and satisfies the required implementation, award full marks ({max_marks}/{max_marks}).\n"
+                f"4. CRITICAL: DO NOT invent or hallucinate non-existent defects or vague complaints (do NOT say 'minor issues with comments', 'minor issues with edge cases', or 'minor issues with code' when the code is fully valid and working).\n"
+                f"5. If deducting marks, state specifically what required topic or algorithm is missing or broken. If all required tasks are satisfied, award full marks.\n"
+                f"6. In 'remark', provide a direct, professional, factual statement confirming what was achieved.\n\n"
+            )
+
         prompt += (
-            f"STUDENT SUBMISSION:\n```\n{student_text[:5000]}\n```\n\n"
-            f"GRADING GUIDELINES:\n"
-            f"1. Objectively evaluate the student's submission against the assignment instructions.\n"
-            f"2. Check if the code or answer correctly implements the required algorithms or topics.\n"
-            f"3. If the code or solution is correct, functional, and satisfies the required implementation, award full marks ({max_marks}/{max_marks}).\n"
-            f"4. CRITICAL: DO NOT invent or hallucinate non-existent defects or vague complaints (do NOT say 'minor issues with comments', 'minor issues with edge cases', or 'minor issues with code' when the code is fully valid and working).\n"
-            f"5. If deducting marks, state specifically what required topic or algorithm is missing or broken. If all required tasks are satisfied, award full marks.\n"
-            f"6. In 'remark', provide a direct, professional, factual statement confirming what was achieved.\n\n"
             f"Respond ONLY with a valid JSON object matching this schema:\n"
             f"{{\n"
             f'  "obtained": <number between 0 and {max_marks}>,\n'
             f'  "semantic_score": <number between 0.0 and 1.0>,\n'
             f'  "matched_keywords": [<list of matched key concepts found in submission>],\n'
-            f'  "remark": "<clear, factual remark stating what was achieved>"\n'
+            f'  "remark": "<clear, factual remark stating what was achieved and exact missing parts/deductions>"\n'
             f"}}"
         )
 
