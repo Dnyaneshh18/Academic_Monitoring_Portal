@@ -706,15 +706,15 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
         code_check = _verify_code_syntax(student_text, title, instructions)
 
         prompt = (
-            f"You are an objective academic professor evaluating a student's coursework/lab submission.\n"
+            f"You are an experienced university Engineering Professor evaluating a student's coursework, lab, or exam submission across Engineering (Computer Science, Mechanical, Electrical, Electronics, Civil, Mathematics, etc.).\n"
             f"ASSIGNMENT TITLE: {title}\n"
         )
         if instructions:
-            prompt += f"INSTRUCTIONS / REQUIREMENTS: {instructions}\n"
+            prompt += f"INSTRUCTIONS / QUESTION REQUIREMENTS: {instructions}\n"
         if model_answer:
             prompt += f"MODEL ANSWER / RUBRIC: {model_answer}\n"
         if keywords:
-            prompt += f"KEY TOPICS / CONCEPTS: {', '.join(keywords)}\n"
+            prompt += f"KEY CONCEPTS / TOPICS: {', '.join(keywords)}\n"
         prompt += f"MAX MARKS: {max_marks}\n\n"
         prompt += f"STUDENT SUBMISSION:\n```\n{student_text[:5000]}\n```\n\n"
 
@@ -723,19 +723,19 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
                 f"CODE VERIFICATION FINDING:\n"
                 f"Compilation error detected: {code_check['message']}\n\n"
                 f"GRADING INSTRUCTIONS FOR CODE DEFICIENCIES:\n"
-                f"1. The code fails to compile because required code or function definitions are missing (e.g. {code_check['message']}).\n"
-                f"2. DO NOT award full marks. Deduct marks proportionally for the missing/undeclared functions (e.g., if one of the two main sorting algorithms like Quick Sort is missing while Merge Sort and partition logic are working, award approximately 13 to 14 marks out of {max_marks}).\n"
-                f"3. In 'remark': State clearly what was implemented (e.g. Merge Sort and partition logic) and explicitly mention what was missing or caused the compilation error (e.g. 'quickSort function is not defined, causing compilation error; deducted 6 marks').\n\n"
+                f"1. The student's code fails to compile because required code or function definitions are missing: {code_check['message']}.\n"
+                f"2. DO NOT award full marks. Deduct marks proportionally for the missing/undeclared functions (e.g., if one of two main algorithms is missing while other functions work, award approximately 60% to 70% of {max_marks}).\n"
+                f"3. In 'remark': State clearly what was implemented and explicitly identify the missing function or compilation error and the deduction.\n\n"
             )
         else:
             prompt += (
-                f"GRADING GUIDELINES:\n"
-                f"1. Objectively evaluate the student's submission against the assignment instructions.\n"
-                f"2. Check if the code or answer correctly implements the required algorithms or topics.\n"
-                f"3. If the code or solution is correct, functional, and satisfies the required implementation, award full marks ({max_marks}/{max_marks}).\n"
-                f"4. CRITICAL: DO NOT invent or hallucinate non-existent defects or vague complaints (do NOT say 'minor issues with comments', 'minor issues with edge cases', or 'minor issues with code' when the code is fully valid and working).\n"
-                f"5. If deducting marks, state specifically what required topic or algorithm is missing or broken. If all required tasks are satisfied, award full marks.\n"
-                f"6. In 'remark', provide a direct, professional, factual statement confirming what was achieved.\n\n"
+                f"PROFESSOR EVALUATION PRINCIPLES:\n"
+                f"1. Evaluate genuinely based on what the student actually submitted compared to the assignment requirements.\n"
+                f"2. Check the accuracy of all technical principles, algorithms, formulas, calculations, code, or explanations.\n"
+                f"3. Full Marks ({max_marks}/{max_marks}): If the student accurately addressed all required parts and the work is correct, functional, and complete.\n"
+                f"4. Proportional Partial Marks: If the student omitted specific questions, derivations, calculations, or secondary requirements, deduct marks proportionally and specifically for the missing parts.\n"
+                f"5. Factual & Objective: Never invent non-existent defects when the answer is valid, and never award full marks when required parts are missing.\n"
+                f"6. Genuine Teacher Remark: Write a professional, constructive remark explaining what was done well, what was missing/incomplete (if anything), and the mark awarded.\n\n"
             )
 
         prompt += (
@@ -744,7 +744,7 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
             f'  "obtained": <number between 0 and {max_marks}>,\n'
             f'  "semantic_score": <number between 0.0 and 1.0>,\n'
             f'  "matched_keywords": [<list of matched key concepts found in submission>],\n'
-            f'  "remark": "<clear, factual remark stating what was achieved and exact missing parts/deductions>"\n'
+            f'  "remark": "<professional teacher remark stating what was achieved and exact breakdown of any deductions>"\n'
             f"}}"
         )
 
