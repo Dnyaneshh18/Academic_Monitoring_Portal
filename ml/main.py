@@ -13,6 +13,8 @@ Run locally:
 """
 
 import base64
+import json
+import urllib.request
 import io
 import os
 import re
@@ -626,6 +628,73 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 
+
+# ---------------------------------------------------------------------------
+# Local LLM Assignment Evaluation (Ollama - 100% Local, Zero Rate Limits)
+# ---------------------------------------------------------------------------
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:3b")
+
+
+def _evaluate_with_ollama(student_text: str, title: str, instructions: str, model_answer: str, keywords: list, max_marks: float):
+    """Evaluate submission using local Ollama LLM on the basis of question and rubric.
+
+    Falls back cleanly to None if Ollama is unreachable or times out, allowing
+    the endpoint to seamlessly use the local SentenceTransformer / TF-IDF engine.
+    """
+    if not student_text or len(student_text.strip()) < 10:
+        return None
+    try:
+        prompt = (
+            f"You are a strict, fair university professor evaluating a student's submission.\n"
+            f"ASSIGNMENT TITLE: {title}\n"
+        )
+        if instructions:
+            prompt += f"INSTRUCTIONS: {instructions}\n"
+        if model_answer:
+            prompt += f"MODEL ANSWER / RUBRIC: {model_answer}\n"
+        if keywords:
+            prompt += f"REQUIRED CONCEPTS: {', '.join(keywords)}\n"
+        prompt += f"MAX MARKS: {max_marks}\n\n"
+        prompt += (
+            f"STUDENT SUBMISSION:\n```\n{student_text[:5000]}\n```\n\n"
+            f"Evaluate the submission carefully:\n"
+            f"1. Check if the code or explanation genuinely answers the assignment question and satisfies instructions.\n"
+            f"2. Award marks up to {max_marks} based on correctness, logic, syntax, algorithms, and completeness.\n"
+            f"3. Deduct marks for missing requirements, bugs, or incomplete answers.\n"
+            f"Respond ONLY with a valid JSON object matching this schema:\n"
+            f"{{\n"
+            f'  "obtained": <number between 0 and {max_marks}>,\n'
+            f'  "semantic_score": <number between 0.0 and 1.0>,\n'
+            f'  "matched_keywords": [<list of matched key concepts found>],\n'
+            f'  "remark": "<1-2 sentence concise academic remark explaining why this mark was awarded>"\n'
+            f"}}"
+        )
+
+        req = urllib.request.Request(
+            OLLAMA_URL,
+            data=json.dumps({
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "format": "json",
+                "stream": False,
+                "options": {
+                    "temperature": 0.1
+                }
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+
+        with urllib.request.urlopen(req, timeout=40) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            raw = data.get("response", "{}")
+            parsed = json.loads(raw)
+            if "obtained" in parsed:
+                return parsed
+    except Exception as e:
+        print(f"[evaluate-assignment] Local LLM ({OLLAMA_MODEL}) skipped, using local NLP: {e}")
+    return None
+
 @app.route("/evaluate-assignment", methods=["POST"])
 def evaluate_assignment():
     """Score student submissions against a model answer / keyword list.
@@ -756,8 +825,36 @@ def evaluate_assignment():
                   f"reference_preview='{reference[:300].replace(chr(10), ' ')}'")
             print(f"[evaluate-assignment] keywords={keywords}")
 
-            sem = semantic_by_pos.get(item_i, 0.0)
             matched = _keyword_coverage(it["text"], keywords)
+
+            # --- Primary: Evaluate with Local LLM (Ollama) on basis of question ---
+            ollama_res = _evaluate_with_ollama(
+                student_text=it["text"],
+                title=title,
+                instructions=instructions,
+                model_answer=model_answer,
+                keywords=keywords,
+                max_marks=max_marks
+            )
+            if ollama_res is not None:
+                obtained_val = min(max_marks, max(0.0, float(ollama_res.get("obtained", 0.0))))
+                remark_val = str(ollama_res.get("remark", "")).strip()
+                result = {
+                    "student_id": sid,
+                    "obtained": _r1(obtained_val),
+                    "semantic_score": _r3(float(ollama_res.get("semantic_score", obtained_val / max_marks))),
+                    "keyword_score": _r3(float(ollama_res.get("keyword_score", len(matched) / max(len(keywords), 1) if keywords else 1.0))),
+                    "completeness_score": _r3(float(ollama_res.get("completeness_score", 1.0))),
+                    "plagiarism_score": _r3(float(ollama_res.get("plagiarism_score", 1.0))),
+                    "matched_keywords": ollama_res.get("matched_keywords") or matched,
+                    "remark": f"Auto-evaluated (LLM): {remark_val}"
+                }
+                if it.get("submission_id"):
+                    result["submission_id"] = it["submission_id"]
+                results.append(result)
+                continue
+
+            sem = semantic_by_pos.get(item_i, 0.0)
             kw_score = len(matched) / len(keywords) if keywords else None
 
             # Completeness: blend of length ratio and concept coverage
