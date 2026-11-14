@@ -694,6 +694,104 @@ def _verify_code_syntax(code: str, title: str = "", instructions: str = ""):
     return None
 
 
+def _check_topic_relevance(student_text: str, title: str, instructions: str, keywords: list):
+    """Check whether the student's submission is about the same topic as the assignment.
+
+    Returns a dict with 'relevant' (bool), 'score' (0.0-1.0), and 'reason' (str).
+    A score below 0.15 means the submission is almost certainly about a different
+    subject entirely (e.g., ML answers submitted to a DSA assignment).
+    """
+    if not student_text or not student_text.strip():
+        return {"relevant": True, "score": 0.0, "reason": ""}
+
+    # Build the assignment topic word set from title + instructions + keywords
+    topic_words_raw = (title + " " + instructions + " " + " ".join(keywords)).lower()
+    topic_tokens = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", topic_words_raw))
+    # Remove generic/stop words that would create false overlap
+    generic = {
+        "the", "and", "for", "with", "from", "that", "this", "are", "was", "were",
+        "have", "has", "had", "been", "will", "can", "could", "should", "may",
+        "not", "all", "each", "every", "both", "any", "such", "also", "more",
+        "most", "very", "just", "only", "well", "even", "still", "about",
+        "write", "program", "programs", "implement", "using", "code", "submit",
+        "explain", "display", "ensure", "mention", "accept", "source", "input",
+        "output", "sample", "along", "properly", "formatted", "executable",
+        "student", "assignment", "marks", "questions", "answer", "required",
+    }
+    topic_tokens -= generic
+
+    # Build the student submission word set (first 3000 chars to be efficient)
+    sub_words_raw = student_text[:3000].lower()
+    sub_tokens = set(re.findall(r"[a-zA-Z][a-zA-Z0-9\-']{2,}", sub_words_raw))
+    sub_tokens -= generic
+
+    if not topic_tokens or not sub_tokens:
+        return {"relevant": True, "score": 0.5, "reason": ""}
+
+    # Calculate overlap: what fraction of assignment topic words appear in the submission
+    overlap = topic_tokens & sub_tokens
+    topic_coverage = len(overlap) / len(topic_tokens) if topic_tokens else 0.0
+
+    # Check keyword hits: how many of the explicit keywords appear in the submission
+    kw_hits = 0
+    sub_lower = sub_words_raw
+    for kw in keywords:
+        kw_l = kw.lower().strip()
+        if not kw_l:
+            continue
+        # Check exact phrase or individual words
+        if kw_l in sub_lower:
+            kw_hits += 1
+        elif len(kw_l.split()) >= 2 and all(w in sub_lower for w in kw_l.split()):
+            kw_hits += 0.5
+    kw_coverage = kw_hits / max(len(keywords), 1) if keywords else 0.5
+
+    # Combined relevance score
+    relevance = topic_coverage * 0.4 + kw_coverage * 0.6
+
+    # Detect completely off-topic: submission has almost zero keyword overlap
+    if relevance < 0.15 and kw_coverage < 0.1:
+        # Double-check: look for strong indicators of a different subject
+        # by checking if the first 500 chars mention a completely different field
+        first_chunk = sub_words_raw[:500]
+        off_topic_signals = [
+            "machine learning", "neural network", "deep learning", "regression",
+            "candidate elimination", "decision tree", "naive bayes", "svm",
+            "support vector", "classification", "clustering", "reinforcement",
+            "blockchain", "smart contract", "cryptocurrency", "ethereum",
+            "operating system", "deadlock", "semaphore", "process scheduling",
+            "compiler design", "lexical analysis", "parsing",
+            "software engineering", "sdlc", "agile", "waterfall",
+            "computer network", "tcp/ip", "osi model", "routing",
+            "database", "normalization", "sql queries", "er diagram",
+        ]
+        found_off_topic = [sig for sig in off_topic_signals if sig in first_chunk]
+        if found_off_topic:
+            return {
+                "relevant": False,
+                "score": round(relevance, 3),
+                "reason": (
+                    f"The submission appears to be about a different subject "
+                    f"(detected: {', '.join(found_off_topic[:3])}). "
+                    f"The assignment requires: {title}. "
+                    f"Only {kw_hits}/{len(keywords)} assignment keywords were found in the submission."
+                )
+            }
+
+    if relevance < 0.15:
+        return {
+            "relevant": False,
+            "score": round(relevance, 3),
+            "reason": (
+                f"Very low topic relevance ({round(relevance*100, 1)}%). "
+                f"Only {kw_hits}/{len(keywords)} assignment keywords found. "
+                f"The submission does not appear to address the assignment: {title}."
+            )
+        }
+
+    return {"relevant": True, "score": round(relevance, 3), "reason": ""}
+
+
 def _evaluate_with_ollama(student_text: str, title: str, instructions: str, model_answer: str, keywords: list, max_marks: float):
     """Evaluate submission using local Ollama LLM on the basis of question and rubric.
 
@@ -704,6 +802,22 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
         return None
     try:
         code_check = _verify_code_syntax(student_text, title, instructions)
+        relevance = _check_topic_relevance(student_text, title, instructions, keywords)
+
+        # --- Fast path: completely off-topic submission ---
+        if not relevance["relevant"]:
+            print(f"[evaluate-assignment] OFF-TOPIC detected: {relevance['reason']}")
+            return {
+                "obtained": 0,
+                "semantic_score": relevance["score"],
+                "matched_keywords": [],
+                "remark": (
+                    f"Auto-evaluated: WRONG DOCUMENT SUBMITTED. "
+                    f"{relevance['reason']} "
+                    f"The student must re-upload the correct document for this assignment. "
+                    f"Marks awarded: 0/{max_marks}."
+                )
+            }
 
         prompt = (
             f"You are an experienced university Engineering Professor evaluating a student's coursework, lab, or exam submission across Engineering (Computer Science, Mechanical, Electrical, Electronics, Civil, Mathematics, etc.).\n"
@@ -730,12 +844,13 @@ def _evaluate_with_ollama(student_text: str, title: str, instructions: str, mode
         else:
             prompt += (
                 f"PROFESSOR EVALUATION PRINCIPLES:\n"
-                f"1. Evaluate genuinely based on what the student actually submitted compared to the assignment requirements.\n"
-                f"2. Check the accuracy of all technical principles, algorithms, formulas, calculations, code, or explanations.\n"
-                f"3. Full Marks ({max_marks}/{max_marks}): If the student accurately addressed all required parts and the work is correct, functional, and complete.\n"
-                f"4. Proportional Partial Marks: If the student omitted specific questions, derivations, calculations, or secondary requirements, deduct marks proportionally and specifically for the missing parts.\n"
-                f"5. Factual & Objective: Never invent non-existent defects when the answer is valid, and never award full marks when required parts are missing.\n"
-                f"6. Genuine Teacher Remark: Write a professional, constructive remark explaining what was done well, what was missing/incomplete (if anything), and the mark awarded.\n\n"
+                f"1. FIRST: Verify the submission is about the CORRECT TOPIC. The assignment is about '{title}'. If the submission is about a completely different subject (e.g., Machine Learning answers for a Data Structures assignment, or Thermodynamics answers for a Database assignment), award 0 marks and state 'Wrong document submitted - the submission is about [detected topic] instead of [required topic].'\n"
+                f"2. Evaluate genuinely based on what the student actually submitted compared to the assignment requirements.\n"
+                f"3. Check the accuracy of all technical principles, algorithms, formulas, calculations, code, or explanations.\n"
+                f"4. Full Marks ({max_marks}/{max_marks}): If the student accurately addressed all required parts and the work is correct, functional, and complete.\n"
+                f"5. Proportional Partial Marks: If the student omitted specific questions, derivations, calculations, or secondary requirements, deduct marks proportionally and specifically for the missing parts.\n"
+                f"6. Factual & Objective: Never invent non-existent defects when the answer is valid, and never award full marks when required parts are missing.\n"
+                f"7. Genuine Teacher Remark: Write a professional, constructive remark explaining what was done well, what was missing/incomplete (if anything), and the mark awarded.\n\n"
             )
 
         prompt += (
